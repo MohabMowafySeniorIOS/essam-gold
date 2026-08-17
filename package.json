@@ -1,0 +1,13 @@
+{
+  "name": "daftar-al-sayegh",
+  "version": "1.0.0",
+  "description": "دفتر الصائغ — نظام إدارة حسابات محل ذهب (خزينة، تجار، فواتير، باركود)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {}
+}
