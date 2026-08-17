@@ -497,7 +497,14 @@ function render(){
   };
   main.className = (currentView==='cash-report') ? 'sheet-white' : '';
   main.innerHTML = renderers[currentView] ? renderers[currentView]() : '<p>غير موجود</p>';
+  if(pendingFocusId){
+    const id = pendingFocusId; pendingFocusId = null;
+    const el = document.getElementById(id);
+    if(el){ el.focus(); try{ el.select(); }catch(e){} }
+  }
 }
+let pendingFocusId = null;
+function refocusAfterRender(id){ pendingFocusId = id; }
 
 /* ============================= DASHBOARD / الخزينة ============================= */
 function totalMerchantsCashOwedToUs(){
@@ -860,7 +867,7 @@ function renderCatalogListTab(tabKey){
     <div class="card" style="margin-bottom:16px;">
       <label>${esc(cfg.singular)} جديد</label>
       <div style="display:flex;gap:10px;">
-        <input id="cat-new-input" placeholder="${esc(cfg.placeholder)}" onkeydown="if(event.key==='Enter')addCatalogEntry('${tabKey}')">
+        <input id="cat-new-input" placeholder="${esc(cfg.placeholder)}" onkeydown="if(event.key==='Enter'){event.preventDefault();addCatalogEntry('${tabKey}');}">
         <button class="btn btn-gold" style="white-space:nowrap;" onclick="addCatalogEntry('${tabKey}')">+ إضافة</button>
       </div>
     </div>
@@ -883,6 +890,8 @@ function addCatalogEntry(tabKey){
   const input = document.getElementById('cat-new-input');
   const name = input.value.trim();
   if(!name){ toast('اكتب اسمًا أولاً'); return; }
+  input.value = '';
+  refocusAfterRender('cat-new-input');
   mutate(()=>{
     state[cfg.key].push({id:uid(tabKey), name});
     state.counters[cfg.counter]++;
@@ -903,14 +912,14 @@ function renderPriceCategoriesTab(){
     <div class="card" style="margin-bottom:16px;">
       <label>فئة سعرية جديدة</label>
       <div class="row">
-        <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="مثال: EG-R/M"></div>
-        <div class="field"><label>السعر</label><input type="number" step="0.01" id="pc-new-price" value="0.00"></div>
+        <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="مثال: EG-R/M" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>أجر الجرام</label><input type="number" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
       </div>
       <button class="btn btn-gold" onclick="addPriceCategory()">+ إضافة</button>
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>الاسم / الرمز</th><th>السعر</th><th style="width:150px;"></th></tr></thead>
+        <thead><tr><th>الاسم / الرمز</th><th>أجر الجرام</th><th style="width:150px;"></th></tr></thead>
         <tbody>
         ${list.length? list.map(x=>`
           <tr>
@@ -918,7 +927,7 @@ function renderPriceCategoriesTab(){
             <td class="num mono">${fmtCash(x.price||0)}</td>
             <td>
               <div style="display:flex;gap:6px;">
-                <button class="btn btn-sm btn-ghost" onclick="openEditPriceCategoryModal('${x.id}')">تعديل السعر</button>
+                <button class="btn btn-sm btn-ghost" onclick="openEditPriceCategoryModal('${x.id}')">تعديل الأجر</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteCatalogEntry('priceCategories','${x.id}')">حذف</button>
               </div>
             </td>
@@ -932,6 +941,7 @@ function addPriceCategory(){
   const name = document.getElementById('pc-new-name').value.trim();
   const price = parseFloat(document.getElementById('pc-new-price').value)||0;
   if(!name){ toast('اكتب اسمًا أو رمزًا أولاً'); return; }
+  refocusAfterRender('pc-new-name');
   mutate(()=>{
     state.priceCategories.push({id:uid('priceCategories'), name, price});
     state.counters.priceCategory++;
@@ -945,9 +955,9 @@ function openEditPriceCategoryModal(id){
     <div class="modal-bg" onclick="if(event.target===this)closeModal()">
       <div class="modal">
         <h2>تعديل الفئة السعرية</h2>
-        <div class="hint">لو تكلفة الفئة دي زادت أو قلّت، عدّل السعر هنا — وكل الأكواد المرتبطة بيها هتاخد السعر الجديد تلقائيًا في أول فاتورة جاية</div>
+        <div class="hint">لو أجر الجرام للفئة دي زاد أو قلّ، عدّله هنا — وكل الأكواد المرتبطة بيها هتاخد الأجر الجديد تلقائيًا في أول فاتورة جاية</div>
         <div class="field"><label>الاسم أو الرمز</label><input id="pc-edit-name" value="${esc(pc.name)}"></div>
-        <div class="field"><label>السعر</label><input type="number" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
+        <div class="field"><label>أجر الجرام</label><input type="number" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
           <button class="btn btn-gold" onclick="submitEditPriceCategory('${id}')">حفظ</button>
@@ -970,7 +980,7 @@ function renderProductsTab(){
   const canAdd = state.itemTypes.length && state.classifications.length && state.priceCategories.length;
   return `
     <div class="card" style="margin-bottom:16px;">
-      <div class="hint" style="margin-bottom:14px;">${canAdd? 'اختر صنفًا وتصنيفًا وفئة سعرية — يتكوّن منتج بكود خاص ياخد سعره تلقائيًا من الفئة السعرية المختارة. لو غيّرت سعر الفئة لاحقًا، كل الأكواد المرتبطة بيها هتاخد السعر الجديد.' : 'أضف عنصرًا واحدًا على الأقل في كل من الأصناف والتصنيفات والفئات السعرية أولاً'}</div>
+      <div class="hint" style="margin-bottom:14px;">${canAdd? 'اختر صنفًا وتصنيفًا وفئة سعرية — يتكوّن منتج بكود خاص ياخد أجر الجرام تلقائيًا من الفئة السعرية المختارة. لو غيّرت أجر الفئة لاحقًا، كل الأكواد المرتبطة بيها هتاخد الأجر الجديد.' : 'أضف عنصرًا واحدًا على الأقل في كل من الأصناف والتصنيفات والفئات السعرية أولاً'}</div>
       ${canAdd? `
         <div class="row">
           <div class="field"><label>الصنف</label><select id="pr-item">${state.itemTypes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
@@ -982,7 +992,7 @@ function renderProductsTab(){
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الفئة السعرية</th><th>السعر الحالي</th><th style="width:90px;"></th></tr></thead>
+        <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الفئة السعرية</th><th>أجر الجرام الحالي</th><th style="width:90px;"></th></tr></thead>
         <tbody>
         ${state.products.length? state.products.map(p=>{
           const it=state.itemTypes.find(x=>x.id===p.itemTypeId);
@@ -1357,8 +1367,16 @@ function renderInvoiceList(kind){
   return `
     <div class="pagehead">
       <div><h1>${title}</h1><p>${desc}</p></div>
-      <button class="btn btn-gold" onclick="${isPurchase?'openPurchaseBuilder()':`openInvoiceModal('sale')`}" ${state.merchants.length?'':'disabled title="أضف تاجرًا أولاً"'}>+ فاتورة جديدة</button>
+      <button class="btn btn-gold" onclick="${isPurchase?'openPurchaseBuilder()':`openInvoiceModal('sale')`}">+ فاتورة جديدة</button>
     </div>
+    ${state.merchants.length? '' : `
+      <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:var(--gold-dim);">
+        <div>
+          <div style="font-weight:700;color:var(--gold-bright);margin-bottom:3px;">لسه مفيش تجار مضافين</div>
+          <div class="muted" style="font-size:12.5px;">الفاتورة لازم تتسجل على تاجر — ضيف تاجر واحد على الأقل الأول وبعدين تقدر تعمل فواتير.</div>
+        </div>
+        <button class="btn btn-gold" style="white-space:nowrap;" onclick="goToAddMerchant()">+ إضافة تاجر دلوقتي</button>
+      </div>`}
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>رقم</th><th>التاريخ</th><th>التاجر</th><th>الأصناف</th>${isPurchase?'<th class="right">إجمالي الوزن</th>':''}<th>طريقة الدفع</th><th class="right">${isPurchase?'إجمالي الأجر':'الإجمالي'}</th></tr></thead>
@@ -1400,8 +1418,12 @@ function resetPurchaseBuilder(){
     serialCursor: state.counters.piece
   };
 }
+function goToAddMerchant(){
+  goto('merchants');
+  setTimeout(()=>openMerchantModal(), 60);
+}
 function openPurchaseBuilder(){
-  if(!state.merchants.length){ toast('أضف تاجرًا أولاً من قائمة التجار'); return; }
+  if(!state.merchants.length){ toast('ضيف تاجر الأول — فتحتلك شاشة إضافة تاجر'); goToAddMerchant(); return; }
   resetPurchaseBuilder();
   goto('purchase-builder');
 }
@@ -1424,11 +1446,10 @@ function renderPurchaseBuilder(){
   const goldBal = merchant? (merchant.balanceGold[pb.karat]||0) : 0;
   const totalWeight = pb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = pb.items.reduce((s,i)=>s+(i.making||0),0);
-  const goldValue = pb.items.reduce((s,i)=>s+i.weight*(i.price||0),0);
 
   return `
     <div class="pagehead">
-      <div><h1>فاتورة شراء من تاجر</h1><p>اختر الكود من الكتالوج على اليمين، ادخل الوزن واضغط Enter — تنزل القطعة بباركود خاص بيها فورًا</p></div>
+      <div><h1>فاتورة شراء من تاجر</h1><p>اختر الكود من الكتالوج على اليمين، ادخل الوزن واضغط Enter — الأجر بيتحسب تلقائيًا (الوزن × أجر الجرام) والقطعة بتنزل بباركود خاص بيها</p></div>
       <button class="btn btn-ghost" onclick="goto('purchases')">← رجوع لقائمة الفواتير</button>
     </div>
 
@@ -1455,7 +1476,7 @@ function renderPurchaseBuilder(){
         <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
-            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>السعر</th><th>الأجر</th><th>الوزن</th><th>الباركود</th><th></th></tr></thead>
+            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>أجر الجرام</th><th>الوزن</th><th class="right">الأجر</th><th>الباركود</th><th></th></tr></thead>
             <tbody id="pb-items-body">
               ${renderPBItemsRows()}
             </tbody>
@@ -1466,7 +1487,6 @@ function renderPurchaseBuilder(){
             <span class="kv-chip">عدد القطع: <b>${pb.items.length}</b></span>
             <span class="kv-chip">إجمالي الوزن: <b>${totalWeight.toFixed(3)}</b> جم</span>
             <span class="kv-chip">إجمالي الأجر: <b>${fmtCash(totalMaking)}</b></span>
-            <span class="kv-chip muted">قيمة الذهب (استرشادي): <b>${fmtCash(goldValue)}</b></span>
           </div>
           <button class="btn btn-sm btn-ghost" onclick="printPBBarcodes()" type="button">🖶 طباعة تسلسل الباركود</button>
         </div>
@@ -1474,7 +1494,7 @@ function renderPurchaseBuilder(){
         <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
           عند الحفظ: <b style="color:var(--gold-bright);">${totalWeight.toFixed(3)} جم</b> عيار ${pb.karat}
           هتتقيد للتاجر في رصيد الذهب (ليه علينا)، و<b style="color:var(--gold-bright);">${fmtCash(totalMaking)}</b>
-          أجر هيتقيد في رصيده النقدي — يخصم منه اللي هتدفعه دلوقتي.
+          أجر (الوزن × أجر الجرام) هيتقيد في رصيده النقدي — يخصم منه اللي هتدفعه دلوقتي.
         </div>
         <div class="row">
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
@@ -1505,7 +1525,7 @@ function renderPurchaseBuilder(){
         </div>
         <div class="tbl-wrap" style="max-height:420px;overflow:auto;">
           <table>
-            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>الفئة السعرية</th><th>السعر</th><th style="width:60px;"></th></tr></thead>
+            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>الفئة السعرية</th><th>أجر الجرام</th><th style="width:60px;"></th></tr></thead>
             <tbody id="pb-catalog-body">
               ${renderPBCatalogRows()}
             </tbody>
@@ -1525,8 +1545,8 @@ function renderPBItemsRows(){
       <td class="mono">${esc(it.code)}</td>
       <td>${esc(it.itemName)}</td>
       <td class="num muted">${fmtCash(it.price)}</td>
-      <td class="num">${fmtCash(it.making||0)}</td>
       <td class="num">${it.weight.toFixed(3)} جم</td>
+      <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making||0)}</td>
       <td><button class="btn btn-sm btn-ghost" onclick="showPiecesBarcodeModal([pb.items.find(x=>x.tempId==='${it.tempId}')])">عرض</button></td>
       <td><span class="rm" style="display:inline-block;" onclick="removePBLine('${it.tempId}')">✕</span></td>
     </tr>
@@ -1546,14 +1566,12 @@ function renderPBAddForm(){
       <span class="kv-chip">الكود: <b>${esc(product.code)}</b></span>
       <span class="kv-chip">الصنف: <b>${esc(it?it.name:'—')}</b></span>
       <span class="kv-chip">التصنيف: <b>${esc(cl?cl.name:'—')}</b></span>
-      <span class="kv-chip">السعر: <b>${fmtCash(pc?pc.price||0:0)}</b></span>
+      <span class="kv-chip">أجر الجرام: <b>${fmtCash(pc?pc.price||0:0)}</b></span>
     </div>
-    <div class="row">
-      <div class="field"><label>الأجرة (اختياري)</label><input type="number" step="0.01" id="pb-making" value="0.00"></div>
-      <div class="field"><label>الوزن (جم) — Enter للإضافة</label>
-        <input type="number" step="0.001" id="pb-weight" placeholder="0.000" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}">
-      </div>
+    <div class="field"><label>الوزن (جم) — Enter للإضافة</label>
+      <input type="number" step="0.001" id="pb-weight" placeholder="0.000" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}">
     </div>
+    <div class="hint" style="margin:-6px 0 12px;">الأجر بيتحسب تلقائيًا: الوزن × أجر الجرام (${fmtCash(pc?pc.price||0:0)})</div>
     <button class="btn btn-sm btn-gold" onclick="addPBLine()" type="button">+ إضافة للفاتورة</button>
   `;
 }
@@ -1636,7 +1654,6 @@ function addPBLine(){
   if(!product){ toast('اختر كودًا من الكتالوج أولاً'); return; }
   const weightInput = document.getElementById('pb-weight');
   const weight = parseFloat(weightInput.value)||0;
-  const making = parseFloat(document.getElementById('pb-making').value)||0;
   if(weight<=0){ toast('أدخل وزن القطعة'); return; }
   const it = state.itemTypes.find(x=>x.id===product.itemTypeId);
   const cl = state.classifications.find(x=>x.id===product.classificationId);
@@ -1648,11 +1665,11 @@ function addPBLine(){
     tempId: uid('dft'), productId: product.id, code: product.code,
     itemName: it? it.name:'—', classificationName: cl? cl.name:'—',
     itemTypeId: product.itemTypeId, classificationId: product.classificationId, priceCategoryId: product.priceCategoryId,
-    price, making, weight, karat: pb.karat, lineTotal: weight*price + making,
+    price, making: weight*price,
+    weight, karat: pb.karat, lineTotal: weight*price,
     serial, barcodeValue
   });
   weightInput.value='';
-  document.getElementById('pb-making').value='0.00';
   render();
   const wEl = document.getElementById('pb-weight');
   if(wEl) wEl.focus();
@@ -1671,7 +1688,6 @@ function submitPurchaseBuilderInvoice(){
   if(!pb.merchantId){ toast('اختر التاجر'); return; }
   const totalWeight = pb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = pb.items.reduce((s,i)=>s+(i.making||0),0);
-  const goldValue = pb.items.reduce((s,i)=>s+i.weight*(i.price||0),0);
   let paid = parseFloat(document.getElementById('pb-paid').value)||0;
   paid = Math.max(0, Math.min(paid, totalMaking));
   const items = pb.items;
@@ -1688,9 +1704,9 @@ function submitPurchaseBuilderInvoice(){
     state.treasury.cash -= paid;
     m.balanceCash -= (totalMaking - paid);
 
-    const invItems = items.map(it=>({karat:it.karat, weight:it.weight, price:it.price, making:it.making, total:it.lineTotal, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, productCode:it.code}));
+    const invItems = items.map(it=>({karat:it.karat, weight:it.weight, price:it.price, makingPerGram:it.price, making:it.making, total:it.lineTotal, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, productCode:it.code}));
     const rec = {id:uid('purchase'), no: state.counters.purchase++, date:todayStr(), merchantId, karat, items:invItems,
-      totalCash: totalMaking, totalMaking, totalWeight, goldValue, settleMode:'weight', amountPaidNow:paid};
+      totalCash: totalMaking, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid};
     state.purchaseInvoices.push(rec);
 
     items.forEach(it=>{
@@ -1703,7 +1719,7 @@ function submitPurchaseBuilderInvoice(){
 }
 
 function openInvoiceModal(kind){
-  if(!state.merchants.length){ toast('أضف تاجرًا أولاً من قائمة التجار'); return; }
+  if(!state.merchants.length){ toast('ضيف تاجر الأول — فتحتلك شاشة إضافة تاجر'); goToAddMerchant(); return; }
   const isPurchase = kind==='purchase';
   const prefix = kind;
   const root=document.getElementById('modal-root');
