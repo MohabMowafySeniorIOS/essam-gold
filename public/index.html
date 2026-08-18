@@ -9,45 +9,46 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
   :root{
-    --bg:#15130f;
-    --panel:#1e1b15;
-    --panel-2:#26221a;
-    --line:#38321f;
-    --gold:#d4af5f;
-    --gold-bright:#e9c877;
-    --gold-dim:#8a6f34;
-    --text:#f2ead8;
-    --muted:#a89a7c;
-    --muted-2:#6f6650;
-    --red:#c85c4a;
-    --red-bg:#3a2019;
-    --green:#7fae6e;
-    --green-bg:#1c2b1a;
-    --radius:10px;
+    --bg:#f2f5f9;
+    --panel:#ffffff;
+    --panel-2:#f5f7fa;
+    --line:#dfe4ea;
+    --gold:#17406e;          /* اللون الأساسي (كحلي) */
+    --gold-bright:#1b5aa0;   /* كحلي فاتح للعناوين والأرقام */
+    --gold-dim:#9fb4cc;
+    --navy:#17406e;
+    --navy-dark:#102c4d;
+    --text:#1f2937;
+    --muted:#5f6b7a;
+    --muted-2:#98a2b3;
+    --red:#c0392b;
+    --red-bg:#fdecea;
+    --green:#1e7e46;
+    --green-bg:#e7f4ec;
+    --radius:8px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background:
-      radial-gradient(1200px 600px at 15% -10%, #241f14 0%, transparent 60%),
-      var(--bg);
+    background:var(--bg);
     color:var(--text);
     font-family:'Tajawal',sans-serif;
     min-height:100vh;
     font-size:14px;
   }
   h1,h2,h3,.disp{font-family:'Almarai',sans-serif;}
-  ::selection{background:var(--gold-dim);color:#fff;}
-  ::-webkit-scrollbar{width:8px;height:8px;}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+  ::selection{background:#cfe0f2;color:#102c4d;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#c6d0dc;border-radius:8px;}
+  ::-webkit-scrollbar-track{background:#eef1f5;}
 
   #shell{display:flex;min-height:100vh;}
 
   /* SIDEBAR */
   #sidebar{
     width:250px;flex:none;
-    background:linear-gradient(180deg,#1a170f,#120f0b);
-    border-left:1px solid var(--line);
+    background:linear-gradient(180deg,#17406e,#102c4d);
+    border-left:1px solid #0d2440;
     padding:22px 14px;
     position:sticky;top:0;height:100vh;
     display:flex;flex-direction:column;gap:4px;
@@ -55,32 +56,29 @@
   .brand{
     display:flex;align-items:center;gap:10px;
     padding:0 8px 20px 8px;margin-bottom:10px;
-    border-bottom:1px solid var(--line);
+    border-bottom:1px solid rgba(255,255,255,.14);
   }
   .brand .mark{
-    width:38px;height:38px;border-radius:9px;
-    background:conic-gradient(from 220deg,var(--gold-bright),var(--gold-dim),var(--gold-bright));
+    width:38px;height:38px;border-radius:8px;
+    background:#fff;
     display:flex;align-items:center;justify-content:center;
-    font-family:'Almarai',sans-serif;font-weight:800;color:#1a1710;font-size:18px;
-    box-shadow:0 4px 14px rgba(212,175,95,.25);
+    font-family:'Almarai',sans-serif;font-weight:800;color:#17406e;font-size:18px;
   }
-  .brand .name{font-family:'Almarai',sans-serif;font-weight:800;font-size:16px;color:var(--gold-bright);line-height:1.1;}
-  .brand .sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+  .brand .name{font-family:'Almarai',sans-serif;font-weight:800;font-size:16px;color:#fff;line-height:1.1;}
+  .brand .sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;}
 
-  .navgroup-label{font-size:10.5px;color:var(--muted-2);letter-spacing:.5px;margin:14px 10px 6px;}
+  .navgroup-label{font-size:10.5px;color:rgba(255,255,255,.45);letter-spacing:.5px;margin:14px 10px 6px;}
   .navitem{
     display:flex;align-items:center;gap:10px;
-    padding:10px 12px;border-radius:8px;cursor:pointer;
-    color:var(--muted);font-size:13.5px;font-weight:500;
+    padding:10px 12px;border-radius:6px;cursor:pointer;
+    color:rgba(255,255,255,.78);font-size:13.5px;font-weight:500;
     transition:.15s;border:1px solid transparent;
     user-select:none;
   }
   .navitem .ic{width:18px;text-align:center;font-size:15px;opacity:.85;}
-  .navitem:hover{background:var(--panel-2);color:var(--text);}
+  .navitem:hover{background:rgba(255,255,255,.09);color:#fff;}
   .navitem.active{
-    background:linear-gradient(90deg,rgba(212,175,95,.16),rgba(212,175,95,.04));
-    color:var(--gold-bright);border-color:rgba(212,175,95,.25);
-    font-weight:700;
+    background:#fff;color:#17406e;border-color:#fff;font-weight:700;
   }
   .navitem .badge{
     margin-inline-start:auto;background:var(--red);color:#fff;font-size:10.5px;
@@ -88,7 +86,7 @@
   }
 
   /* MAIN */
-  #main{flex:1;padding:26px 30px 60px;max-width:1400px;}
+  #main{flex:1;padding:26px 30px 60px;max-width:1500px;}
   .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;gap:16px;flex-wrap:wrap;}
   .pagehead h1{font-size:22px;margin:0 0 4px;color:var(--text);}
   .pagehead p{margin:0;color:var(--muted);font-size:13px;}
@@ -98,13 +96,12 @@
     padding:9px 16px;border-radius:8px;font-family:'Tajawal';font-weight:700;font-size:13px;
     cursor:pointer;transition:.15s;
   }
-  .btn:hover{border-color:var(--gold-dim);}
+  .btn:hover{border-color:var(--navy);color:var(--navy);}
   .btn-gold{
-    background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#20190a;border:none;
-    box-shadow:0 3px 12px rgba(212,175,95,.25);
+    background:var(--navy);color:#fff;border:1px solid var(--navy);
   }
-  .btn-gold:hover{filter:brightness(1.06);}
-  .btn-danger{background:var(--red-bg);color:#f1a898;border:1px solid #5c2e24;}
+  .btn-gold:hover{background:var(--navy-dark);border-color:var(--navy-dark);}
+  .btn-danger{background:var(--red-bg);color:#a5281c;border:1px solid #f0c2bc;}
   .btn-danger:hover{border-color:var(--red);}
   .btn-ghost{background:transparent;border:1px solid var(--line);}
   .btn-sm{padding:6px 11px;font-size:12px;border-radius:7px;}
@@ -118,8 +115,9 @@
   @media(max-width:1100px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-3{grid-template-columns:repeat(2,1fr);}}
 
   .card{
-    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    background:var(--panel);
     border:1px solid var(--line);border-radius:var(--radius);padding:18px;
+    box-shadow:0 1px 2px rgba(16,44,77,.05);
   }
   .stat .label{color:var(--muted);font-size:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
   .stat .value{font-family:'Almarai';font-size:24px;font-weight:800;color:var(--gold-bright);}
@@ -132,18 +130,18 @@
 
   table{width:100%;border-collapse:collapse;font-size:13px;}
   thead th{
-    text-align:right;color:var(--muted);font-weight:700;font-size:11.5px;
-    padding:9px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.015);
+    text-align:right;color:#43536a;font-weight:700;font-size:11.5px;
+    padding:10px;border-bottom:1px solid #d3dae3;background:#eef2f7;
   }
-  tbody td{padding:10px 10px;border-bottom:1px solid #241f16;color:var(--text);}
-  tbody tr:hover{background:rgba(212,175,95,.045);}
-  .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  tbody td{padding:10px;border-bottom:1px solid #eef1f5;color:var(--text);}
+  tbody tr:hover{background:#f6f9fd;}
+  .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;overflow-x:auto;box-shadow:0 1px 2px rgba(16,44,77,.05);}
   .empty-row td{text-align:center;color:var(--muted-2);padding:30px;}
 
   .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
-  .pill-gold{background:rgba(212,175,95,.15);color:var(--gold-bright);border:1px solid rgba(212,175,95,.3);}
-  .pill-green{background:var(--green-bg);color:var(--green);border:1px solid #2e4a2a;}
-  .pill-red{background:var(--red-bg);color:#f1a898;border:1px solid #5c2e24;}
+  .pill-gold{background:#e8f0fa;color:var(--navy);border:1px solid #c3d7ee;}
+  .pill-green{background:var(--green-bg);color:var(--green);border:1px solid #bfe0cc;}
+  .pill-red{background:var(--red-bg);color:#a5281c;border:1px solid #f0c2bc;}
   .pill-muted{background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
 
   .mono{font-family:'Almarai';}
@@ -154,22 +152,23 @@
   /* FORMS */
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500;}
   input,select,textarea{
-    width:100%;background:#100e0a;border:1px solid var(--line);color:var(--text);
-    padding:9px 11px;border-radius:8px;font-family:'Tajawal';font-size:13.5px;outline:none;
+    width:100%;background:#fff;border:1px solid #cbd3dd;color:var(--text);
+    padding:9px 11px;border-radius:6px;font-family:'Tajawal';font-size:13.5px;outline:none;
   }
-  input:focus,select:focus,textarea:focus{border-color:var(--gold-dim);}
+  input:focus,select:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(23,64,110,.10);}
+  input::placeholder{color:#a9b2be;}
   .field{margin-bottom:13px;}
   .row{display:flex;gap:12px;}
   .row>*{flex:1;}
 
   .modal-bg{
-    position:fixed;inset:0;background:rgba(8,7,5,.72);backdrop-filter:blur(2px);
+    position:fixed;inset:0;background:rgba(16,32,52,.45);backdrop-filter:blur(2px);
     display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;
   }
   .modal{
     background:var(--panel);border:1px solid var(--line);border-radius:14px;
     width:100%;max-width:560px;max-height:88vh;overflow:auto;padding:22px;
-    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    box-shadow:0 20px 60px rgba(16,44,77,.22);
   }
   .modal.wide{max-width:760px;}
   .modal h2{margin:0 0 4px;font-size:17px;}
@@ -187,22 +186,43 @@
 
   .toast{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
-    background:var(--panel-2);border:1px solid var(--gold-dim);color:var(--text);
-    padding:11px 20px;border-radius:9px;font-size:13px;z-index:100;
-    box-shadow:0 8px 24px rgba(0,0,0,.4);animation:up .25s ease;
+    background:var(--navy);border:1px solid var(--navy-dark);color:#fff;
+    padding:11px 20px;border-radius:8px;font-size:13px;z-index:100;
+    box-shadow:0 8px 24px rgba(16,44,77,.3);animation:up .25s ease;
   }
   @keyframes up{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
 
   .kv-inline{display:flex;gap:6px;flex-wrap:wrap;}
-  .kv-chip{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:12px;}
-  .kv-chip b{color:var(--gold-bright);}
+  .kv-chip{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:12px;}
+  .kv-chip b{color:var(--navy);}
 
   .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);}
   .tab{padding:9px 14px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
-  .tab.active{color:var(--gold-bright);border-color:var(--gold-bright);}
+  .tab.active{color:var(--navy);border-color:var(--navy);}
 
   .searchbar{display:flex;gap:10px;margin-bottom:14px;}
   .searchbar input{max-width:280px;}
+
+  /* ============ فلاتر + جداول عريضة ============ */
+  .filterbar{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:12px;
+    box-shadow:0 1px 2px rgba(16,44,77,.05);
+  }
+  .fb-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .filterbar .f{display:flex;flex-direction:column;gap:5px;min-width:150px;}
+  .filterbar .f.auto{min-width:auto;flex:0 0 auto;}
+  .filterbar .f > span{font-size:10.5px;color:var(--muted-2);letter-spacing:.3px;}
+  .filterbar input,.filterbar select{padding:7px 10px;font-size:12.5px;}
+  .filterbar .spacer{flex:1;}
+
+  table.tl-table{min-width:900px;}
+  table.tl-table td,table.tl-table th{white-space:nowrap;}
+  table.tl-table td:nth-child(4){white-space:normal;}
+  tfoot td{
+    padding:11px 10px;font-weight:800;font-family:'Almarai';font-size:13px;
+    border-top:2px solid #cbd5e1;background:#eef2f7;color:var(--navy);
+  }
 
   /* ============ تقرير حسابات النقدية (شكل التقرير الأبيض) ============ */
   #main.sheet-white{background:#fff;padding:0;max-width:none;}
@@ -283,7 +303,7 @@
 </div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<div id="save-indicator" style="position:fixed;bottom:14px;left:14px;font-size:11px;color:var(--muted-2);z-index:60;"></div>
+<div id="save-indicator" style="position:fixed;bottom:14px;left:14px;font-size:11px;color:var(--muted);z-index:60;background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 8px;"></div>
 
 <script>
 /* ============================= STATE ============================= */
@@ -292,6 +312,7 @@ let state = null;
 let currentView = 'dashboard';
 let uiState = { pendingTab:'pending', txtSearch:'', cpTab:'all', summaryKarat: 21, catalogTab:'classifications', pbShowNewCode:false,
   repFrom:'', repTo:'', repKind:'', repColsOpen:false,
+  stmtMerchantId:null, stmtFrom:'', stmtTo:'', stmtOpen:{},
   repCols:{date:true, in:true, out:true, bal:true, kind:true, merchant:true, stmt:true, no:true} };
 
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
@@ -442,6 +463,7 @@ const NAV = [
   {group:'التجار', items:[
     {id:'merchants', label:'التجار وأكوادهم', icon:'⌘'},
     {id:'merchant-summary', label:'إجمالي أرصدة التجار', icon:'≡'},
+    {id:'merchant-statement', label:'كشف حساب تاجر', icon:'▦'},
     {id:'purchases', label:'فواتير مشتريات من تاجر', icon:'↙'},
     {id:'sales', label:'فواتير مبيعات لتاجر', icon:'↗'},
     {id:'pending', label:'الأنجراره (المعلّقة)', icon:'⏳', badgeKey:'pendingCount'},
@@ -488,8 +510,10 @@ function render(){
     pieces: renderPieces,
     merchants: renderMerchants,
     'merchant-summary': renderMerchantSummary,
+    'merchant-statement': renderMerchantStatement,
     purchases: renderPurchases,
     'purchase-builder': renderPurchaseBuilder,
+    'sale-builder': renderSaleBuilder,
     sales: renderSales,
     pending: renderPending,
     settlements: renderSettlements,
@@ -1122,8 +1146,23 @@ function renderMerchants(){
     <div class="searchbar">
       <input placeholder="بحث بالاسم أو الكود..." value="${esc(uiState.txtSearch)}" oninput="uiState.txtSearch=this.value;render();">
     </div>
-    <div class="grid grid-3">
-      ${list.length? list.map(m=>renderMerchantCard(m)).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="ic">⌘</div>لا يوجد تجار مطابقون</div>`}
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px;">الكود</th>
+            <th>اسم التاجر</th>
+            <th style="width:100px;">العيار الأساسي</th>
+            <th style="width:130px;">رقم الهاتف</th>
+            <th class="right" style="width:170px;">الرصيد النقدي</th>
+            <th style="width:220px;">رصيد الذهب</th>
+            <th style="width:230px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+        ${list.length? list.map(m=>renderMerchantRow(m)).join('') : `<tr class="empty-row"><td colspan="7">لا يوجد تجار مطابقون</td></tr>`}
+        </tbody>
+      </table>
     </div>
 
     <div class="section-title">حركات التحصيل والتسديد<div class="line"></div></div>
@@ -1162,41 +1201,50 @@ function renderCPHistory(){
     </div>
   `;
 }
-function renderMerchantCard(m){
+function merchantKarat(m){
+  if(!m) return state.karats.includes(21)? 21 : state.karats[0];
+  const k = Number(m.defaultKarat);
+  return state.karats.includes(k)? k : (state.karats.includes(21)? 21 : state.karats[0]);
+}
+function renderMerchantRow(m){
   const goldRows = goldMapTotalsRow(m.balanceGold);
   const cashTone = m.balanceCash>0?'pill-green': m.balanceCash<0?'pill-red':'pill-muted';
-  const cashLabel = m.balanceCash>0? 'مدين لنا' : m.balanceCash<0? 'نحن مدينون له' : 'متزن';
+  const cashLabel = m.balanceCash>0? 'لنا' : m.balanceCash<0? 'علينا' : 'متزن';
   return `
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div>
-          <div style="font-weight:800;font-size:15px;">${esc(m.name)}</div>
-          <div class="muted" style="font-size:12px;margin-top:2px;">كود: ${esc(m.code)} ${m.phone?(' · '+esc(m.phone)):''}</div>
+    <tr>
+      <td class="mono muted">${esc(m.code)}</td>
+      <td style="font-weight:700;">${esc(m.name)}</td>
+      <td><span class="pill pill-gold">عيار ${merchantKarat(m)}</span></td>
+      <td class="muted num">${m.phone? esc(m.phone) : '—'}</td>
+      <td class="right">
+        <span class="pill ${cashTone}" style="margin-left:6px;">${cashLabel}</span>
+        <span class="mono num" style="font-weight:700;">${fmtCash(Math.abs(m.balanceCash))}</span>
+      </td>
+      <td>${goldRows.length? `<div class="kv-inline">${goldRows.map(g=>`<span class="kv-chip">ع${g.k}: <b>${g.w.toFixed(3)}</b></span>`).join('')}</div>` : `<span class="muted" style="font-size:12px;">—</span>`}</td>
+      <td>
+        <div style="display:flex;gap:6px;justify-content:flex-end;">
+          <button class="btn btn-sm btn-ghost" onclick="openCPModal('collect','${m.id}')">↙ تحصيل</button>
+          <button class="btn btn-sm btn-ghost" onclick="openCPModal('pay','${m.id}')">↗ تسديد</button>
+          <button class="btn btn-sm btn-ghost" onclick="openMerchantStatement('${m.id}')">▦ كشف حساب</button>
+          <button class="btn btn-sm btn-gold" onclick="openMerchantModal('${m.id}')">تعديل</button>
         </div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn btn-sm btn-ghost" onclick="openMerchantModal('${m.id}')">تعديل</button>
-        </div>
-      </div>
-      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span class="pill ${cashTone}">${cashLabel}</span>
-        <span class="mono num" style="font-weight:800;">${fmtCash(Math.abs(m.balanceCash))}</span>
-      </div>
-      <div class="kv-inline" style="margin-top:10px;">
-        ${goldRows.length? goldRows.map(g=>`<span class="kv-chip">ع${g.k}: <b>${g.w.toFixed(3)}</b> جم</span>`).join('') : `<span class="muted" style="font-size:12px;">لا يوجد رصيد ذهب</span>`}
-      </div>
-      <div style="display:flex;gap:6px;margin-top:12px;">
-        <button class="btn btn-sm btn-ghost" style="flex:1;" onclick="openCPModal('collect','${m.id}')">↙ تحصيل</button>
-        <button class="btn btn-sm btn-ghost" style="flex:1;" onclick="openCPModal('pay','${m.id}')">↗ تسديد</button>
-      </div>
-    </div>
+      </td>
+    </tr>
   `;
 }
+/* تحويل كل أوزان الذهب لعيار 21 المكافئ: وزن × (العيار ÷ 21) */
+const BASE_KARAT = 21;
+function goldTo21(balanceGold){
+  let total = 0;
+  state.karats.forEach(k=>{
+    const w = Number(balanceGold[k])||0;
+    if(w) total += w * (k / BASE_KARAT);
+  });
+  return total;
+}
 function renderMerchantSummary(){
-  const karat = uiState.summaryKarat;
-  if(!state.karats.includes(karat)) uiState.summaryKarat = karat = state.karats.includes(21)? 21 : state.karats[0];
-
   const rows = [...state.merchants].sort((a,b)=> a.name.localeCompare(b.name,'ar'));
-  const totalGold = rows.reduce((s,m)=> s + (m.balanceGold[karat]||0), 0);
+  const totalGold = rows.reduce((s,m)=> s + goldTo21(m.balanceGold), 0);
   const totalCash = rows.reduce((s,m)=> s + (m.balanceCash||0), 0);
 
   function goldCell(v){
@@ -1216,17 +1264,12 @@ function renderMerchantSummary(){
 
   return `
     <div class="pagehead">
-      <div><h1>إجمالي أرصدة التجار</h1><p>رصيد عيار محدد والرصيد النقدي لكل تاجر — أخضر لصالحنا، أحمر علينا</p></div>
-      <div class="field" style="min-width:160px;margin:0;">
-        <select onchange="uiState.summaryKarat=parseFloat(this.value);render();">
-          ${state.karats.map(k=>`<option value="${k}" ${k===karat?'selected':''}>عيار ${k}</option>`).join('')}
-        </select>
-      </div>
+      <div><h1>إجمالي أرصدة التجار</h1><p>رصيد الذهب لكل تاجر محوّل كله لعيار ${BASE_KARAT} مع الرصيد النقدي — أخضر لصالحنا، أحمر علينا</p></div>
     </div>
 
     <div class="grid grid-2" style="margin-bottom:18px;">
       <div class="card stat ${totalGold>0?'pos':totalGold<0?'neg':''}">
-        <div class="label"><span>إجمالي رصيد عيار ${karat} لكل التجار</span></div>
+        <div class="label"><span>إجمالي رصيد الذهب لكل التجار (بعيار ${BASE_KARAT})</span></div>
         <div class="value">${totalGold===0? 'متزن' : (totalGold>0?'لنا: ':'علينا: ') + Math.abs(totalGold).toFixed(3) + ' جم'}</div>
       </div>
       <div class="card stat ${totalCash>0?'pos':totalCash<0?'neg':''}">
@@ -1237,15 +1280,18 @@ function renderMerchantSummary(){
 
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>التاجر</th><th>الكود</th><th>رصيد عيار ${karat}</th><th>الرصيد النقدي</th></tr></thead>
+        <thead><tr><th>التاجر</th><th>الكود</th><th>رصيد الذهب (بعيار ${BASE_KARAT})</th><th>تفصيل العيارات</th><th>الرصيد النقدي</th></tr></thead>
         <tbody>
         ${rows.length? rows.map(m=>`
           <tr>
             <td>${esc(m.name)}</td>
             <td class="mono muted">${esc(m.code)}</td>
-            <td>${goldCell(m.balanceGold[karat])}</td>
+            <td>${goldCell(goldTo21(m.balanceGold))}</td>
+            <td>${(()=>{ const g = goldMapTotalsRow(m.balanceGold);
+              return g.length? `<div class="kv-inline">${g.map(x=>`<span class="kv-chip">ع${x.k}: <b>${x.w.toFixed(3)}</b></span>`).join('')}</div>` : `<span class="muted" style="font-size:12px;">—</span>`;
+            })()}</td>
             <td>${cashCell(m.balanceCash)}</td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="4">لا يوجد تجار بعد</td></tr>`}
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="5">لا يوجد تجار بعد</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1259,12 +1305,20 @@ function openMerchantModal(id){
     <div class="modal-bg" onclick="if(event.target===this)closeModal()">
       <div class="modal">
         <h2>${m?'تعديل بيانات تاجر':'إضافة تاجر جديد'}</h2>
-        <div class="hint">${m?'يمكن تعديل الاسم والكود ورقم الهاتف. الأرصدة تُدار من الفواتير والتسويات.':'سيُنشأ رصيد صفري نقدي وذهب لكل عيار'}</div>
+        <div class="hint">${m?'يمكن تعديل الاسم والكود والعيار الأساسي ورقم الهاتف. الأرصدة تُدار من الفواتير والتسويات.':'سيُنشأ رصيد صفري نقدي وذهب لكل عيار'}</div>
         <div class="row">
           <div class="field"><label>اسم التاجر</label><input id="mc-name" value="${m?esc(m.name):''}" placeholder="اسم التاجر"></div>
           <div class="field"><label>الكود</label><input id="mc-code" value="${m?esc(m.code):('T-'+String(state.counters.merchant).padStart(3,'0'))}" placeholder="كود التاجر"></div>
         </div>
-        <div class="field"><label>رقم الهاتف (اختياري)</label><input id="mc-phone" value="${m?esc(m.phone||''):''}" placeholder="01xxxxxxxxx"></div>
+        <div class="row">
+          <div class="field"><label>العيار الأساسي للتاجر</label>
+            <select id="mc-karat">
+              ${state.karats.map(k=>`<option value="${k}" ${merchantKarat(m)===k?'selected':''}>عيار ${k}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>رقم الهاتف (اختياري)</label><input id="mc-phone" value="${m?esc(m.phone||''):''}" placeholder="01xxxxxxxxx"></div>
+        </div>
+        <div class="hint" style="margin-top:-6px;">العيار الأساسي هو اللي هيتفتح تلقائيًا في فاتورة الشراء لما تختار التاجر ده — وتقدر تغيّره داخل الفاتورة عادي.</div>
         <div class="modal-actions">
           ${m?`<button class="btn btn-danger" onclick="deleteMerchant('${m.id}')" style="margin-left:auto;">حذف التاجر</button>`:''}
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -1277,14 +1331,15 @@ function submitMerchant(id){
   const name = document.getElementById('mc-name').value.trim();
   const code = document.getElementById('mc-code').value.trim();
   const phone = document.getElementById('mc-phone').value.trim();
+  const defaultKarat = parseFloat(document.getElementById('mc-karat').value);
   if(!name || !code){ toast('أدخل الاسم والكود'); return; }
   if(state.merchants.some(m=>m.code===code && m.id!==id)){ toast('هذا الكود مستخدم بالفعل'); return; }
   mutate(()=>{
     if(id){
       const m = merchantById(id);
-      m.name=name; m.code=code; m.phone=phone;
+      m.name=name; m.code=code; m.phone=phone; m.defaultKarat=defaultKarat;
     } else {
-      state.merchants.push({id:uid('mer'), code, name, phone, balanceCash:0, balanceGold: emptyGoldMap()});
+      state.merchants.push({id:uid('mer'), code, name, phone, defaultKarat, balanceCash:0, balanceGold: emptyGoldMap()});
       state.counters.merchant++;
     }
   }, id?'تم حفظ بيانات التاجر':'تمت إضافة التاجر');
@@ -1295,6 +1350,295 @@ function deleteMerchant(id){
     mutate(()=>{ state.merchants = state.merchants.filter(m=>m.id!==id); }, 'تم حذف التاجر');
     closeModal();
   }, {confirmLabel:'حذف التاجر'});
+}
+
+
+/* ============================= كشف حساب تاجر ============================= */
+function openMerchantStatement(id){
+  uiState.stmtMerchantId = id;
+  uiState.stmtOpen = {};
+  goto('merchant-statement');
+}
+function stmtToggle(key){
+  uiState.stmtOpen[key] = !uiState.stmtOpen[key];
+  render();
+}
+function goldMapLabel(map){
+  const rows = state.karats.map(k=>({k, w:map[k]||0})).filter(x=>x.w!==0);
+  if(!rows.length) return '';
+  return rows.map(x=>'ع'+x.k+': '+x.w.toFixed(3)).join('، ');
+}
+
+/* كل حركة بتأثر على حساب التاجر: cash = التغير في رصيده النقدي، gold = خريطة تغير أوزانه */
+function merchantStatementEntries(merchantId){
+  const out = [];
+  const g = (k,w)=>{ const m={}; if(k && w) m[k]=w; return m; };
+
+  state.purchaseInvoices.filter(i=>i.merchantId===merchantId).forEach(i=>{
+    const making = (i.totalMaking!=null? i.totalMaking : i.totalCash)||0;
+    const weight = (i.totalWeight!=null? i.totalWeight : (i.items||[]).reduce((s,x)=>s+x.weight,0))||0;
+    const byKarat = {};
+    (i.items||[]).forEach(x=>{ byKarat[x.karat] = (byKarat[x.karat]||0) - x.weight; });
+    out.push({
+      date:i.date, kind:'purchase', key:'pi_'+i.id, ref:'#'+i.no,
+      type:'فاتورة مشتريات', desc:'شراء بالوزن — '+((i.items||[]).length)+' قطعة، إجمالي '+weight.toFixed(3)+' جم',
+      cash: -(making - (i.amountPaidNow||0)),
+      gold: i.settleMode==='weight'? byKarat : {},
+      inv: i
+    });
+  });
+  state.salesInvoices.filter(i=>i.merchantId===merchantId).forEach(i=>{
+    const byKarat = {};
+    if(i.settleMode==='weight') (i.items||[]).forEach(x=>{ byKarat[x.karat] = (byKarat[x.karat]||0) + x.weight; });
+    const w = (i.totalWeight!=null? i.totalWeight : (i.items||[]).reduce((s,x)=>s+x.weight,0))||0;
+    out.push({date:i.date, kind:'sale', key:'si_'+i.id, ref:'#'+i.no, type:'فاتورة مبيعات',
+      desc: i.settleMode==='weight'
+        ? ('بيع بالوزن — '+((i.items||[]).length)+' قطعة، إجمالي '+w.toFixed(3)+' جم، أجر '+fmtCash(i.totalMaking||i.totalCash||0))
+        : ('بيع لتاجر — إجمالي '+fmtCash(i.totalCash)+(i.amountPaidNow? ' · مدفوع '+fmtCash(i.amountPaidNow):'')),
+      cash: (i.totalCash||0) - (i.amountPaidNow||0), gold: byKarat, inv:i, isSale:true});
+  });
+  state.collections.filter(i=>i.merchantId===merchantId).forEach(i=>{
+    const gold={}; (i.items||[]).forEach(x=>{ gold[x.karat]=(gold[x.karat]||0)-x.weight; });
+    out.push({date:i.date, kind:'collect', key:'co_'+i.id, ref:'#'+i.no, type:'تحصيل من تاجر',
+      desc:[(i.cash? 'نقدية '+fmtCash(i.cash)+(i.cashMode==='treasury'?' (خزينة)':' (على الحساب)') : ''), (goldMapLabel(gold)? 'ذهب '+goldMapLabel(gold):''), (i.note||'')].filter(Boolean).join(' · '),
+      cash: -(i.cash||0), gold});
+  });
+  state.payments.filter(i=>i.merchantId===merchantId).forEach(i=>{
+    const gold={}; (i.items||[]).forEach(x=>{ gold[x.karat]=(gold[x.karat]||0)+x.weight; });
+    out.push({date:i.date, kind:'pay', key:'pa_'+i.id, ref:'#'+i.no, type:'تسديد لتاجر',
+      desc:[(i.cash? 'نقدية '+fmtCash(i.cash)+(i.cashMode==='treasury'?' (خزينة)':' (على الحساب)') : ''), (goldMapLabel(gold)? 'ذهب '+goldMapLabel(gold):''), (i.note||'')].filter(Boolean).join(' · '),
+      cash: (i.cash||0), gold});
+  });
+  state.settlements.filter(i=>i.merchantId===merchantId).forEach(i=>{
+    const sign = i.type==='debit'? 1 : -1;
+    out.push({date:i.date, kind:'settle', key:'st_'+i.id, ref:'#'+i.no, type:'تسوية حساب',
+      desc:(i.type==='debit'?'قيد علي التاجر':'قيد لصالح التاجر')+(i.note? ' · '+i.note:''),
+      cash: sign*(i.cash||0), gold: g(i.karat, sign*(i.weight||0))});
+  });
+  state.transfers.filter(i=>i.fromMerchantId===merchantId || i.toMerchantId===merchantId).forEach(i=>{
+    const isFrom = i.fromMerchantId===merchantId;
+    const sign = isFrom? -1 : 1;
+    out.push({date:i.date, kind:'transfer', key:'tr_'+i.id, ref:'#'+i.no, type:'تحويل رصيد',
+      desc: isFrom? ('تحويل إلى '+merchantName(i.toMerchantId)) : ('تحويل من '+merchantName(i.fromMerchantId)),
+      cash: sign*(i.cash||0), gold: g(i.karat, sign*(i.weight||0))});
+  });
+  state.pendingSales.filter(p=>p.merchantId===merchantId && p.status==='confirmed').forEach(p=>{
+    out.push({date:p.confirmedDate||p.date, kind:'pending', key:'pd_'+p.id, ref:'#'+p.no, type:'قطعة معلّقة مؤكدة',
+      desc:'عيار '+p.karat+' · '+p.weight+' جم × '+fmtCash(p.pricePerGram), cash:(p.totalCash||0), gold:{}});
+  });
+
+  return out.map((e,i)=>Object.assign(e,{date:String(e.date).slice(0,10), _i:i}))
+    .sort((a,b)=>{ const d=new Date(a.date)-new Date(b.date); return d!==0? d : a._i-b._i; });
+}
+
+function renderMerchantStatement(){
+  if(!state.merchants.length){
+    return `<div class="pagehead"><div><h1>كشف حساب تاجر</h1><p>اختر تاجرًا لعرض كل حركاته وتفاصيل فواتيره</p></div></div>
+      <div class="empty-state"><div class="ic">⌘</div>لسه مفيش تجار — ضيف تاجر الأول من صفحة التجار</div>`;
+  }
+  let m = merchantById(uiState.stmtMerchantId);
+  if(!m){ m = state.merchants[0]; uiState.stmtMerchantId = m.id; }
+
+  const from = uiState.stmtFrom||'', to = uiState.stmtTo||'';
+  const all = merchantStatementEntries(m.id);
+
+  let openCash = 0; const openGold = {};
+  if(from) all.forEach(e=>{ if(e.date < from){ openCash += e.cash; Object.entries(e.gold).forEach(([k,v])=>openGold[k]=(openGold[k]||0)+v); } });
+
+  let bal = openCash; const gbal = Object.assign({}, openGold);
+  const rows = [];
+  all.forEach(e=>{
+    if(from && e.date < from) return;
+    if(to && e.date > to) return;
+    bal += e.cash;
+    Object.entries(e.gold).forEach(([k,v])=>gbal[k]=(gbal[k]||0)+v);
+    rows.push(Object.assign({}, e, {bal, gbal21: goldTo21(gbal)}));
+  });
+
+  const totalDr = rows.reduce((s,r)=> s + (r.cash>0? r.cash:0), 0);
+  const totalCr = rows.reduce((s,r)=> s + (r.cash<0? -r.cash:0), 0);
+  const totalGoldIn = rows.reduce((s,r)=> s + Object.entries(r.gold).reduce((a,[k,v])=> a + (v>0? v*(k/BASE_KARAT):0),0), 0);
+  const totalGoldOut = rows.reduce((s,r)=> s + Object.entries(r.gold).reduce((a,[k,v])=> a + (v<0? -v*(k/BASE_KARAT):0),0), 0);
+
+  const cashNow = m.balanceCash||0, gold21Now = goldTo21(m.balanceGold);
+  const tone = v => v>0? 'pos' : v<0? 'neg' : '';
+  const owe = v => v===0? 'متزن' : (v>0? 'لنا: ' : 'علينا: ');
+
+  return `
+    <div class="pagehead">
+      <div><h1>كشف حساب تاجر</h1><p>كل حركات التاجر بالترتيب مع الرصيد بعد كل حركة — وتفاصيل كل فاتورة مشتريات بالقطع</p></div>
+      <button class="btn" onclick="printMerchantStatement()">🖨 طباعة الكشف</button>
+    </div>
+
+    <div class="filterbar">
+      <div class="fb-row">
+        <div class="f" style="min-width:230px;"><span>التاجر</span>
+          <select onchange="uiState.stmtMerchantId=this.value;uiState.stmtOpen={};render();">
+            ${state.merchants.map(x=>`<option value="${x.id}" ${x.id===m.id?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}
+          </select>
+        </div>
+        <div class="f"><span>من تاريخ</span><input type="date" value="${esc(from)}" onchange="uiState.stmtFrom=this.value;render();"></div>
+        <div class="f"><span>إلى تاريخ</span><input type="date" value="${esc(to)}" onchange="uiState.stmtTo=this.value;render();"></div>
+        <div class="spacer"></div>
+        <div class="f auto"><span>&nbsp;</span><button class="btn btn-ghost btn-sm" onclick="uiState.stmtFrom='';uiState.stmtTo='';render();">↺ كل الفترات</button></div>
+      </div>
+    </div>
+
+    <div class="grid grid-4">
+      <div class="card stat ${tone(cashNow)}"><div class="label"><span>الرصيد النقدي الحالي</span></div>
+        <div class="value">${cashNow===0?'متزن': owe(cashNow)+fmtCash(Math.abs(cashNow))}</div></div>
+      <div class="card stat ${tone(gold21Now)}"><div class="label"><span>رصيد الذهب الحالي (بعيار ${BASE_KARAT})</span></div>
+        <div class="value">${gold21Now===0?'متزن': owe(gold21Now)+Math.abs(gold21Now).toFixed(3)+' جم'}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي مدين (لنا)</span></div><div class="value">${fmtCash(totalDr)}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي دائن (علينا)</span></div><div class="value">${fmtCash(totalCr)}</div></div>
+    </div>
+
+    <div class="kv-inline" style="margin-top:12px;">
+      <div class="kv-chip">عدد الحركات: <b>${rows.length}</b></div>
+      <div class="kv-chip">رصيد أول المدة: <b>${openCash===0?'متزن': owe(openCash)+fmtCash(Math.abs(openCash))}</b></div>
+      <div class="kv-chip">ذهب داخل لنا (ع${BASE_KARAT}): <b>${totalGoldIn.toFixed(3)} جم</b></div>
+      <div class="kv-chip">ذهب علينا (ع${BASE_KARAT}): <b>${totalGoldOut.toFixed(3)} جم</b></div>
+    </div>
+
+    <div class="section-title">حركات الحساب<div class="line"></div></div>
+    <div class="tbl-wrap">
+      <table class="tl-table">
+        <thead>
+          <tr>
+            <th style="width:95px;">التاريخ</th>
+            <th style="width:60px;">رقم</th>
+            <th style="width:150px;">نوع الحركة</th>
+            <th>البيان</th>
+            <th class="right" style="width:120px;">مدين (لنا)</th>
+            <th class="right" style="width:120px;">دائن (علينا)</th>
+            <th class="right" style="width:135px;">الرصيد</th>
+            <th style="width:150px;">حركة الذهب</th>
+            <th style="width:80px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length? rows.map(r=>{
+            const goldTxt = goldMapLabel(r.gold);
+            const opened = !!uiState.stmtOpen[r.key];
+            return `
+            <tr>
+              <td class="muted num">${fmtDateRep(r.date)}</td>
+              <td class="mono muted">${esc(r.ref)}</td>
+              <td><span class="pill pill-muted">${esc(r.type)}</span></td>
+              <td>${esc(r.desc)}</td>
+              <td class="right num" style="color:${r.cash>0?'var(--green)':'var(--muted-2)'};">${r.cash>0? fmtCash(r.cash):'—'}</td>
+              <td class="right num" style="color:${r.cash<0?'var(--red)':'var(--muted-2)'};">${r.cash<0? fmtCash(-r.cash):'—'}</td>
+              <td class="right num" style="font-weight:700;">${r.bal===0?'متزن': (r.bal>0?'لنا ':'علينا ')+fmtCash(Math.abs(r.bal))}</td>
+              <td class="num" style="font-size:12px;color:${goldTxt?'var(--text)':'var(--muted-2)'};">${goldTxt||'—'}</td>
+              <td>${(r.kind==='purchase' || (r.kind==='sale' && r.inv && r.inv.settleMode==='weight'))? `<button class="btn btn-sm btn-ghost" onclick="stmtToggle('${r.key}')">${opened?'إخفاء':'تفاصيل'}</button>`:''}</td>
+            </tr>
+            ${opened && r.inv? `
+            <tr>
+              <td colspan="9" style="background:var(--panel-2);padding:0;">
+                ${renderInvoiceDetail(r.inv, r.kind)}
+              </td>
+            </tr>`:''}`;
+          }).join('') : `<tr class="empty-row"><td colspan="9">لا توجد حركات على حساب التاجر في الفترة دي</td></tr>`}
+        </tbody>
+        ${rows.length? `
+        <tfoot>
+          <tr>
+            <td colspan="4">الإجمالي</td>
+            <td class="right num">${fmtCash(totalDr)}</td>
+            <td class="right num">${fmtCash(totalCr)}</td>
+            <td class="right num">${bal===0?'متزن':(bal>0?'لنا ':'علينا ')+fmtCash(Math.abs(bal))}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>`:''}
+      </table>
+    </div>
+  `;
+}
+
+function renderInvoiceDetail(inv, kind){
+  const isSale = kind==='sale';
+  const items = inv.items||[];
+  const making = (inv.totalMaking!=null? inv.totalMaking : inv.totalCash)||0;
+  const weight = (inv.totalWeight!=null? inv.totalWeight : items.reduce((s,x)=>s+x.weight,0))||0;
+  return `
+    <div style="padding:14px 16px;">
+      <div class="kv-inline" style="margin-bottom:10px;">
+        <span class="kv-chip">${isSale?'فاتورة بيع رقم':'فاتورة شراء رقم'}: <b>#${inv.no}</b></span>
+        <span class="kv-chip">التاريخ: <b>${fmtDateRep(inv.date)}</b></span>
+        <span class="kv-chip">عدد القطع: <b>${items.length}</b></span>
+        <span class="kv-chip">إجمالي الوزن: <b>${weight.toFixed(3)} جم</b></span>
+        <span class="kv-chip">إجمالي الأجر: <b>${fmtCash(making)}</b></span>
+        <span class="kv-chip">${isSale?'المحصّل نقدًا':'المدفوع نقدًا'}: <b>${fmtCash(inv.amountPaidNow||0)}</b></span>
+        <span class="kv-chip">الباقي على الحساب: <b>${fmtCash(Math.max(0, making-(inv.amountPaidNow||0)))}</b></span>
+      </div>
+      <table>
+        <thead><tr><th>${isSale?'الباركود':'الكود'}</th><th>الصنف</th><th>التصنيف</th><th>العيار</th><th class="right">الوزن</th><th class="right">أجر الجرام</th><th class="right">الأجر</th></tr></thead>
+        <tbody>
+          ${items.length? items.map(it=>{
+            const itn = it.itemTypeId? state.itemTypes.find(x=>x.id===it.itemTypeId) : null;
+            const cln = it.classificationId? state.classifications.find(x=>x.id===it.classificationId) : null;
+            const mk = it.making!=null? it.making : (it.weight*(it.price||0));
+            return `<tr>
+              <td class="mono" style="font-size:12px;">${esc(isSale? (it.barcodeValue||it.productCode||'—') : (it.productCode||'—'))}</td>
+              <td>${itn? esc(itn.name):'—'}</td>
+              <td>${cln? esc(cln.name):'—'}</td>
+              <td class="muted">عيار ${it.karat}</td>
+              <td class="right num">${Number(it.weight).toFixed(3)} جم</td>
+              <td class="right num muted">${fmtCash(it.price||0)}</td>
+              <td class="right num" style="font-weight:700;">${fmtCash(mk)}</td>
+            </tr>`;
+          }).join('') : `<tr class="empty-row"><td colspan="7">مفيش قطع في الفاتورة</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function printMerchantStatement(){
+  const m = merchantById(uiState.stmtMerchantId);
+  if(!m){ toast('اختر تاجرًا أولاً'); return; }
+  const from = uiState.stmtFrom||'', to = uiState.stmtTo||'';
+  const all = merchantStatementEntries(m.id);
+  let openCash = 0;
+  if(from) all.forEach(e=>{ if(e.date<from) openCash += e.cash; });
+  let bal = openCash; const rows=[];
+  all.forEach(e=>{
+    if(from && e.date<from) return;
+    if(to && e.date>to) return;
+    bal += e.cash;
+    rows.push(Object.assign({},e,{bal}));
+  });
+  if(!rows.length){ toast('لا توجد حركات لطباعتها'); return; }
+  const nf = n => (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const period = (!from && !to)? 'كل الفترات' : ('من '+(from? fmtDateRep(from):'البداية')+' إلى '+(to? fmtDateRep(to):'اليوم'));
+  const totalDr = rows.reduce((s,r)=>s+(r.cash>0?r.cash:0),0);
+  const totalCr = rows.reduce((s,r)=>s+(r.cash<0?-r.cash:0),0);
+  const area = document.getElementById('report-print-area');
+  area.innerHTML = `
+    <div class="rp">
+      <h1>كشف حساب — ${esc(m.name)} (${esc(m.code)})</h1>
+      <div class="rp-sub">${esc(period)} • عدد الحركات: ${rows.length} • تاريخ الطباعة: ${fmtDateRep(todayStr())}</div>
+      <div class="rp-cards">
+        <div class="rp-card"><b>رصيد أول المدة</b><span>${nf(Math.abs(openCash))} ${openCash>=0?'(لنا)':'(علينا)'}</span></div>
+        <div class="rp-card"><b>إجمالي مدين</b><span>${nf(totalDr)}</span></div>
+        <div class="rp-card"><b>إجمالي دائن</b><span>${nf(totalCr)}</span></div>
+        <div class="rp-card"><b>الرصيد آخر المدة</b><span>${nf(Math.abs(bal))} ${bal>=0?'(لنا)':'(علينا)'}</span></div>
+      </div>
+      <table>
+        <thead><tr><th>التاريخ</th><th>رقم</th><th>نوع الحركة</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th><th>حركة الذهب</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${fmtDateRep(r.date)}</td><td>${esc(r.ref)}</td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td>
+            <td>${r.cash>0? nf(r.cash):'—'}</td><td>${r.cash<0? nf(-r.cash):'—'}</td>
+            <td>${nf(Math.abs(r.bal))} ${r.bal>=0?'(لنا)':'(علينا)'}</td>
+            <td>${esc(goldMapLabel(r.gold)||'—')}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr><td colspan="4">الإجمالي</td><td>${nf(totalDr)}</td><td>${nf(totalCr)}</td><td>${nf(Math.abs(bal))} ${bal>=0?'(لنا)':'(علينا)'}</td><td></td></tr></tfoot>
+      </table>
+      <div class="rp-foot"><span>دفتر الصائغ — كشف حساب تاجر</span><span>التوقيع: ................................</span></div>
+    </div>`;
+  document.body.classList.add('print-report');
+  setTimeout(()=>{ window.print(); setTimeout(()=>{ document.body.classList.remove('print-report'); area.innerHTML=''; },500); }, 80);
 }
 
 /* ============================= فواتير مشتريات / مبيعات (مشترك) ============================= */
@@ -1367,7 +1711,7 @@ function renderInvoiceList(kind){
   return `
     <div class="pagehead">
       <div><h1>${title}</h1><p>${desc}</p></div>
-      <button class="btn btn-gold" onclick="${isPurchase?'openPurchaseBuilder()':`openInvoiceModal('sale')`}">+ فاتورة جديدة</button>
+      <button class="btn btn-gold" onclick="${isPurchase?'openPurchaseBuilder()':'openSaleBuilder()'}">+ فاتورة جديدة</button>
     </div>
     ${state.merchants.length? '' : `
       <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:var(--gold-dim);">
@@ -1379,7 +1723,7 @@ function renderInvoiceList(kind){
       </div>`}
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>رقم</th><th>التاريخ</th><th>التاجر</th><th>الأصناف</th>${isPurchase?'<th class="right">إجمالي الوزن</th>':''}<th>طريقة الدفع</th><th class="right">${isPurchase?'إجمالي الأجر':'الإجمالي'}</th></tr></thead>
+        <thead><tr><th>رقم</th><th>التاريخ</th><th>التاجر</th><th>الأصناف</th><th class="right">إجمالي الوزن</th><th>طريقة الدفع</th><th class="right">${isPurchase?'إجمالي الأجر':'إجمالي الأجر / الإجمالي'}</th></tr></thead>
         <tbody>
         ${sorted.length? sorted.map(inv=>`
           <tr>
@@ -1390,14 +1734,14 @@ function renderInvoiceList(kind){
               const itName = i.itemTypeId? state.itemTypes.find(x=>x.id===i.itemTypeId) : null;
               return `<span class="pill pill-gold" style="margin:1px;">${itName?esc(itName.name)+' · ':''}ع${i.karat} · ${i.weight}جم</span>`;
             }).join('')}</td>
-            ${isPurchase? `<td class="right num">${(inv.totalWeight!=null? inv.totalWeight : inv.items.reduce((s,i)=>s+i.weight,0)).toFixed(3)} جم</td>`:''}
+            <td class="right num">${(inv.totalWeight!=null? inv.totalWeight : inv.items.reduce((s,i)=>s+i.weight,0)).toFixed(3)} جم</td>
             <td>${(()=>{
               const due = inv.totalCash||0;
               if(due<=0) return `<span class="pill pill-muted">بالوزن فقط</span>`;
               return `<span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع كامل':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>`;
             })()}</td>
             <td class="right num">${fmtCash(inv.totalCash)}</td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="${isPurchase?7:6}">لا توجد فواتير بعد</td></tr>`}
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لا توجد فواتير بعد</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1410,7 +1754,7 @@ let pb = null; // purchase-builder page state
 function resetPurchaseBuilder(){
   pb = {
     merchantId: state.merchants[0]? state.merchants[0].id : null,
-    karat: state.karats.includes(21)? 21 : state.karats[0],
+    karat: merchantKarat(state.merchants[0]),
     search: '',
     classFilter: '',
     selectedProductId: null,
@@ -1456,7 +1800,7 @@ function renderPurchaseBuilder(){
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>التاجر</label>
-          <select onchange="pb.merchantId=this.value;render();">
+          <select onchange="pb.merchantId=this.value;pb.karat=merchantKarat(merchantById(this.value));render();">
             ${state.merchants.map(m=>`<option value="${m.id}" ${pb.merchantId===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}
           </select>
         </div>
@@ -1584,7 +1928,7 @@ function renderPBCatalogRows(){
     const cl = state.classifications.find(x=>x.id===p.classificationId);
     const pc = state.priceCategories.find(x=>x.id===p.priceCategoryId);
     const active = pb.selectedProductId===p.id;
-    return `<tr style="cursor:pointer;${active?'background:rgba(212,175,95,.12);':''}" onclick="selectPBProduct('${p.id}')">
+    return `<tr style="cursor:pointer;${active?'background:#e8f0fa;':''}" onclick="selectPBProduct('${p.id}')">
       <td>${cl?esc(cl.name):'<span class="muted">—</span>'}</td>
       <td class="mono">${esc(p.code)}</td>
       <td>${it?esc(it.name):'<span class="muted">—</span>'}</td>
@@ -1882,6 +2226,185 @@ function submitCPTransaction(kind){
     if(isCollect) state.collections.push(rec); else state.payments.push(rec);
   }, isCollect? 'تم تسجيل التحصيل من التاجر' : 'تم تسجيل التسديد للتاجر');
   closeModal();
+}
+
+
+/* ============================= فاتورة مبيعات لتاجر (بالباركود) ============================= */
+let sb = null;
+
+function pieceMakingRate(piece){
+  const pc = piece.priceCategoryId? state.priceCategories.find(x=>x.id===piece.priceCategoryId) : null;
+  if(pc) return pc.price||0;
+  const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
+  if(prod){ const p2 = state.priceCategories.find(x=>x.id===prod.priceCategoryId); if(p2) return p2.price||0; }
+  return 0;
+}
+function pieceLabel(piece){
+  const it = piece.itemTypeId? state.itemTypes.find(x=>x.id===piece.itemTypeId) : null;
+  if(it) return it.name;
+  const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
+  if(prod){ const i2 = state.itemTypes.find(x=>x.id===prod.itemTypeId); if(i2) return i2.name; }
+  return '—';
+}
+function pieceCode(piece){
+  const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
+  return prod? prod.code : '—';
+}
+function findPieceByScan(code){
+  code = String(code||'').trim();
+  if(!code) return null;
+  let p = state.pieces.find(x=> String(x.barcodeValue)===code);
+  if(p) return p;
+  const asNo = parseInt(code, 10);
+  if(!isNaN(asNo)) p = state.pieces.find(x=> Number(x.no)===asNo);
+  return p||null;
+}
+
+function openSaleBuilder(){
+  if(!state.merchants.length){ toast('ضيف تاجر الأول — فتحتلك شاشة إضافة تاجر'); goToAddMerchant(); return; }
+  sb = { merchantId: state.merchants[0].id, items: [] };
+  goto('sale-builder');
+}
+function addSalePieceByScan(){
+  const input = document.getElementById('sb-scan');
+  const raw = input? input.value : '';
+  const piece = findPieceByScan(raw);
+  if(!piece){ toast('الباركود ده مش موجود في القطع'); if(input){input.value=''; input.focus();} return; }
+  if(piece.sold){ toast('القطعة دي متباعة قبل كده'); if(input){input.value=''; input.focus();} return; }
+  if(sb.items.some(x=>x.pieceId===piece.id)){ toast('القطعة دي مضافة في الفاتورة بالفعل'); if(input){input.value=''; input.focus();} return; }
+  const rate = pieceMakingRate(piece);
+  sb.items.push({
+    pieceId: piece.id, no: piece.no, code: pieceCode(piece), itemName: pieceLabel(piece),
+    karat: piece.karat, weight: piece.weight, rate, making: piece.weight*rate,
+    barcodeValue: piece.barcodeValue
+  });
+  if(input) input.value='';
+  refocusAfterRender('sb-scan');
+  render();
+}
+function removeSaleLine(pieceId){
+  sb.items = sb.items.filter(x=>x.pieceId!==pieceId);
+  refocusAfterRender('sb-scan');
+  render();
+}
+function setSaleRate(pieceId, val){
+  const it = sb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  it.rate = parseFloat(val)||0;
+  it.making = it.weight * it.rate;
+  render();
+}
+
+function renderSaleBuilder(){
+  if(!sb) { openSaleBuilder(); return '<div class="empty-state">...</div>'; }
+  const m = merchantById(sb.merchantId);
+  const totalWeight = sb.items.reduce((s,i)=>s+i.weight,0);
+  const totalMaking = sb.items.reduce((s,i)=>s+i.making,0);
+  const cashBal = m? m.balanceCash : 0;
+  const goldBal = m? goldTo21(m.balanceGold) : 0;
+  const available = state.pieces.filter(p=>!p.sold).length;
+
+  return `
+    <div class="pagehead">
+      <div><h1>فاتورة مبيعات لتاجر</h1><p>امسح باركود القطعة (أو اكتب رقمها) واضغط Enter — القطعة تنزل بوزنها وأجرها تلقائيًا</p></div>
+      <button class="btn btn-ghost" onclick="goto('sales')">← رجوع لقائمة الفواتير</button>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="grid grid-4">
+        <div class="field" style="margin:0;"><label>التاجر المشتري</label>
+          <select onchange="sb.merchantId=this.value;render();">
+            ${state.merchants.map(x=>`<option value="${x.id}" ${sb.merchantId===x.id?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}
+          </select>
+        </div>
+        <div class="stat" style="margin:0;"><div class="label"><span>رصيد نقدية التاجر الحالي</span></div><div class="value" style="font-size:17px;">${fmtCash(cashBal)}</div></div>
+        <div class="stat" style="margin:0;"><div class="label"><span>رصيد ذهب التاجر (ع${BASE_KARAT})</span></div><div class="value" style="font-size:17px;">${fmtW(goldBal)}</div></div>
+        <div class="stat" style="margin:0;"><div class="label"><span>قطع متاحة للبيع</span></div><div class="value" style="font-size:17px;">${available}</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <label>امسح الباركود هنا</label>
+      <div style="display:flex;gap:10px;">
+        <input id="sb-scan" placeholder="امسح الباركود أو اكتب رقم القطعة واضغط Enter..." autofocus
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addSalePieceByScan();}">
+        <button class="btn btn-gold" style="white-space:nowrap;" onclick="addSalePieceByScan()">+ إضافة القطعة</button>
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${sb.items.length}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي وزن الذهب</span></div><div class="value">${totalWeight.toFixed(3)} <small>جم</small></div></div>
+      <div class="card stat pos"><div class="label"><span>إجمالي أجر الفاتورة</span></div><div class="value">${fmtCash(totalMaking)}</div></div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-bottom:16px;">
+      <table class="tl-table">
+        <thead><tr><th style="width:70px;">م</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>العيار</th><th class="right">الوزن</th><th style="width:130px;">أجر الجرام</th><th class="right">الأجر</th><th style="width:50px;"></th></tr></thead>
+        <tbody>
+          ${sb.items.length? sb.items.map((it,idx)=>`
+            <tr>
+              <td class="mono muted">${it.no}</td>
+              <td class="mono" style="font-size:12px;">${esc(it.barcodeValue||'—')}</td>
+              <td class="mono">${esc(it.code)}</td>
+              <td>${esc(it.itemName)}</td>
+              <td class="muted">عيار ${it.karat}</td>
+              <td class="right num">${it.weight.toFixed(3)} جم</td>
+              <td><input type="number" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setSaleRate('${it.pieceId}',this.value)"></td>
+              <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making)}</td>
+              <td><span class="rm" style="display:inline-block;" onclick="removeSaleLine('${it.pieceId}')">✕</span></td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="9">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
+        </tbody>
+        ${sb.items.length? `<tfoot><tr>
+          <td colspan="5">الإجمالي</td>
+          <td class="right num">${totalWeight.toFixed(3)} جم</td>
+          <td></td>
+          <td class="right num">${fmtCash(totalMaking)}</td>
+          <td></td>
+        </tr></tfoot>`:''}
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
+      عند الحفظ: <b style="color:var(--gold-bright);">${totalWeight.toFixed(3)} جم</b> هتخرج من مخزون الخزينة وتتقيد على التاجر (ليه علينا يقل / عليه لنا يزيد)،
+      و<b style="color:var(--gold-bright);">${fmtCash(totalMaking)}</b> أجر هيتقيد لنا على التاجر — يخصم منه اللي هتحصّله دلوقتي.
+    </div>
+    <div class="row">
+      <div class="field"><label>المحصّل نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="sb-paid" value="${totalMaking.toFixed(2)}"></div>
+      <div class="field" style="display:flex;align-items:flex-end;">
+        <button class="btn btn-gold" style="width:100%;" onclick="submitSaleBuilderInvoice()">حفظ الفاتورة</button>
+      </div>
+    </div>
+  `;
+}
+
+function submitSaleBuilderInvoice(){
+  if(!sb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
+  if(!sb.merchantId){ toast('اختر التاجر'); return; }
+  const totalWeight = sb.items.reduce((s,i)=>s+i.weight,0);
+  const totalMaking = sb.items.reduce((s,i)=>s+i.making,0);
+  let paid = parseFloat(document.getElementById('sb-paid').value)||0;
+  paid = Math.max(0, Math.min(paid, totalMaking));
+  const items = sb.items, merchantId = sb.merchantId;
+
+  mutate(()=>{
+    const m = merchantById(merchantId);
+    items.forEach(it=>{
+      state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) - it.weight;
+      m.balanceGold[it.karat] = (m.balanceGold[it.karat]||0) + it.weight;
+      const pc = state.pieces.find(x=>x.id===it.pieceId);
+      if(pc){ pc.sold = true; pc.soldDate = todayStr(); pc.soldToMerchantId = merchantId; }
+    });
+    state.treasury.cash += paid;
+    m.balanceCash += (totalMaking - paid);
+
+    const invItems = items.map(it=>({pieceId:it.pieceId, pieceNo:it.no, karat:it.karat, weight:it.weight,
+      price:it.rate, makingPerGram:it.rate, making:it.making, total:it.making, productCode:it.code, barcodeValue:it.barcodeValue}));
+    state.salesInvoices.push({id:uid('sale'), no: state.counters.sale++, date:todayStr(), merchantId, items:invItems,
+      totalCash: totalMaking, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid});
+  }, 'تم حفظ فاتورة البيع');
+  sb = null;
+  goto('sales');
 }
 
 /* ============================= الأنجراره (المعلّقة) ============================= */
