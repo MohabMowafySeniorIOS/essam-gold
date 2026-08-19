@@ -293,6 +293,23 @@
     .report-sheet .rep-filters,.report-sheet .rep-colsbar{display:none;}
   }
 
+  .valwrap{display:inline-flex;align-items:center;gap:6px;}
+  .valwrap b{font-family:'Almarai';font-size:13.5px;}
+  .copy-btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+    border-radius:5px;width:22px;height:22px;line-height:1;font-size:12px;cursor:pointer;padding:0;
+  }
+  .copy-btn:hover{border-color:var(--navy);color:var(--navy);}
+  .copy-btn.ok{border-color:var(--green);color:var(--green);}
+
+  /* جدول شبكي بفواصل وحدود واضحة */
+  table.grid-table th,table.grid-table td{border:1px solid #d3dae3;}
+  table.grid-table thead th{background:#eef2f7;font-size:12px;padding:9px 8px;line-height:1.35;}
+  table.grid-table td.big{font-family:'Almarai';font-weight:800;font-size:17px;color:var(--gold-bright);padding:14px 8px;}
+  table.grid-table td.zero{color:var(--muted-2);font-weight:400;}
+  table.grid-table .total-col{background:#f3f7fc;}
+  .center{text-align:center;}
+
   /* ============ ملصقات الباركود ============ */
   #print-area .lbl{
     display:flex;align-items:stretch;background:#fff;color:#000;
@@ -365,7 +382,8 @@ function defaultState(){
     priceCategories: [],
     products: [],
     pieces: [],
-    settings: { shopName:'دفتر الصائغ' },
+    settings: { shopName:'دفتر الصائغ', goldPrices:{} },
+    employees: [],
     counters: { merchant:1, purchase:1, sale:1, pending:1, settlement:1, transfer:1, scrap:1, collection:1, payment:1, itemType:1, classification:1, priceCategory:1, product:1, piece:1 }
   };
 }
@@ -386,7 +404,9 @@ async function loadState(){
       if(!state.priceCategories) state.priceCategories=[];
       if(!state.products) state.products=[];
       if(!state.pieces) state.pieces=[];
-      state.settings = Object.assign({shopName:'دفتر الصائغ'}, state.settings||{});
+      state.settings = Object.assign({shopName:'دفتر الصائغ', goldPrices:{}}, state.settings||{});
+      state.settings.goldPrices = state.settings.goldPrices||{};
+      if(!state.employees) state.employees=[];
       const cdef = { merchant:1, purchase:1, sale:1, pending:1, settlement:1, transfer:1, scrap:1, collection:1, payment:1, itemType:1, classification:1, priceCategory:1, product:1, piece:1 };
       state.counters = Object.assign(cdef, state.counters||{});
     } else {
@@ -535,6 +555,23 @@ function showConfirmModal(message, onYes, opts){
       </div>
     </div>`;
   document.getElementById('confirm-yes-btn').onclick = function(){ onYes(); };
+}
+function copyBtn(value){
+  return `<button class="copy-btn" title="نسخ الرقم" onclick="copyVal(this, '${String(value).replace(/'/g,"\\'")}')">⧉</button>`;
+}
+function copyVal(btn, value){
+  const done = ()=>{ const old = btn.textContent; btn.textContent='✓'; btn.classList.add('ok');
+    setTimeout(()=>{ btn.textContent=old; btn.classList.remove('ok'); }, 1200); toast('تم نسخ الرقم: '+value); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(value).then(done).catch(()=>fallbackCopy(value, done));
+  } else fallbackCopy(value, done);
+}
+function fallbackCopy(value, done){
+  const ta = document.createElement('textarea');
+  ta.value = value; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){ toast('تعذر النسخ'); }
+  ta.remove();
 }
 function esc(s){ return (s??'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -850,6 +887,68 @@ function renderTopClassCard(title, subtitle, rows){
     </div>`;
 }
 
+function pieceClassificationId(pc){
+  if(pc.classificationId) return pc.classificationId;
+  const pr = pc.productId? state.products.find(x=>x.id===pc.productId) : null;
+  return pr? pr.classificationId : null;
+}
+
+/* جرد ذهب أعداد: عدد القطع الموجودة بالمخزن لكل تصنيف × عيار */
+function goldCountInventory(){
+  const karats = [...state.karats].sort((a,b)=>b-a);
+  const rows = {};
+  const totals = {}; karats.forEach(k=>totals[k]=0);
+  let grand = 0;
+  state.pieces.filter(pc=>!pc.sold).forEach(pc=>{
+    const cid = pieceClassificationId(pc);
+    const key = cid || '__none__';
+    if(!rows[key]){ rows[key] = {id:cid, counts:{}, total:0}; karats.forEach(k=>rows[key].counts[k]=0); }
+    const k = Number(pc.karat);
+    if(rows[key].counts[k]===undefined) rows[key].counts[k]=0;
+    rows[key].counts[k]++; rows[key].total++;
+    totals[k] = (totals[k]||0)+1; grand++;
+  });
+  const list = Object.values(rows).sort((a,b)=> b.total-a.total);
+  return {karats, list, totals, grand};
+}
+
+function renderGoldCountInventory(){
+  const {karats, list, totals, grand} = goldCountInventory();
+  return `
+    <div class="section-title">جرد ذهب أعداد<div class="line"></div></div>
+    <div class="tbl-wrap">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>اسم مجموعة الأصناف</th>
+            ${karats.map(k=>`<th class="right" style="width:95px;">عدد (${k})</th>`).join('')}
+            <th class="right" style="width:110px;">الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.length? list.map(r=>`
+            <tr>
+              <td style="font-weight:700;">${esc(classificationName(r.id))}</td>
+              ${karats.map(k=>{
+                const v = r.counts[k]||0;
+                return `<td class="right num" style="color:${v? 'var(--text)' : 'var(--muted-2)'};font-weight:${v?'700':'400'};">${v}</td>`;
+              }).join('')}
+              <td class="right num" style="font-weight:800;color:var(--navy);">${r.total}</td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="${karats.length+2}">لسه مفيش قطع في المخزن</td></tr>`}
+        </tbody>
+        ${list.length? `
+        <tfoot>
+          <tr>
+            <td>الإجمالي</td>
+            ${karats.map(k=>`<td class="right num">${totals[k]||0}</td>`).join('')}
+            <td class="right num">${grand}</td>
+          </tr>
+        </tfoot>`:''}
+      </table>
+    </div>
+  `;
+}
+
 function renderHome(){
   const now = new Date();
   const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -880,6 +979,8 @@ function renderHome(){
       ${renderTopClassCard('خلال الشهر', 'من أول '+monthName+' لحد النهارده — '+ms.p+' قطعة، '+ms.w.toFixed(3)+' جم', monthRows)}
       ${renderTopClassCard('خلال السنة', 'من أول يناير '+now.getFullYear()+' لحد النهارده — '+ys.p+' قطعة، '+ys.w.toFixed(3)+' جم', yearRows)}
     </div>
+
+    ${renderGoldCountInventory()}
   `;
 }
 
@@ -900,17 +1001,24 @@ function renderDashboard(){
     </div>
 
     <div class="section-title">مخزون الذهب بالخزينة (بالعيار)<div class="line"></div></div>
-    <div class="grid grid-4">
-      ${state.karats.map(k=>`
-        <div class="card stat">
-          <div class="label"><span>عيار ${k}</span></div>
-          <div class="value">${fmtW(state.treasury.gold[k]||0)}</div>
-        </div>
-      `).join('')}
-      <div class="card stat pos" style="border-color:var(--navy);">
-        <div class="label"><span>إجمالي كل العيارات (محوّل لعيار ${BASE_KARAT})</span></div>
-        <div class="value">${fmtW(gold21)}</div>
-      </div>
+    <div class="tbl-wrap">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            ${state.karats.map(k=>`<th class="center">عيار ${k}</th>`).join('')}
+            <th class="center total-col">إجمالي كل العيارات<br><span style="font-weight:400;">(محوّل لعيار ${BASE_KARAT})</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            ${state.karats.map(k=>{
+              const v = state.treasury.gold[k]||0;
+              return `<td class="center num big ${v?'':'zero'}">${fmtW(v)}</td>`;
+            }).join('')}
+            <td class="center num big total-col" style="color:var(--green);">${fmtW(gold21)}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     ${renderCashReport()}
@@ -952,19 +1060,34 @@ function renderScrap(){
       <div><h1>شراء الدهب الكسر بالعيار</h1><p>شراء دهب كسر من العملاء مباشرة وإضافته لمخزون الخزينة</p></div>
       <button class="btn btn-gold" onclick="openScrapModal()">+ عملية شراء جديدة</button>
     </div>
+
+    <div class="section-title" style="margin-top:0;">سعر جرام الذهب المحدد (بيتحط تلقائيًا في الفاتورة)<div class="line"></div></div>
+    <div class="tbl-wrap" style="margin-bottom:18px;">
+      <table class="grid-table">
+        <thead><tr>${state.karats.map(k=>`<th class="center">عيار ${k}</th>`).join('')}</tr></thead>
+        <tbody><tr>
+          ${state.karats.map(k=>`<td class="center"><input type="number" step="0.01" style="text-align:center;max-width:130px;margin:0 auto;"
+             value="${Number(state.settings.goldPrices[k]||0).toFixed(2)}" onchange="setGoldPrice(${k}, this.value)"></td>`).join('')}
+        </tr></tbody>
+      </table>
+    </div>
+
+    <div class="section-title">عمليات شراء الكسر<div class="line"></div></div>
     <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>التاريخ</th><th>اسم العميل</th><th>العيار</th><th>الوزن</th><th>سعر الجرام</th><th class="right">الإجمالي</th></tr></thead>
+      <table class="tl-table">
+        <thead><tr><th>التاريخ</th><th>اسم العميل</th><th>العيار</th><th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right">سعر الجرام (ع${BASE_KARAT})</th><th class="right">الإجمالي</th><th>الموظف</th></tr></thead>
         <tbody>
           ${list.length? list.map(s=>`
             <tr>
-              <td class="muted num">${fmtDate(s.date)}</td>
+              <td class="muted num">${fmtDateRep(s.date)}</td>
               <td>${esc(s.customerName||'—')}</td>
-              <td><span class="pill pill-gold">${s.karat}</span></td>
-              <td class="num">${fmtW(s.weight)}</td>
-              <td class="num">${fmtCash(s.pricePerGram)}</td>
-              <td class="right num">${fmtCash(s.totalCash)}</td>
-            </tr>`).join('') : `<tr class="empty-row"><td colspan="6">لا توجد عمليات شراء بعد</td></tr>`}
+              <td><span class="pill pill-gold">عيار ${s.karat}</span></td>
+              <td class="right num">${fmtW(s.weight)}</td>
+              <td class="right num">${fmtCash(s.pricePerGram)}</td>
+              <td class="right num" style="color:var(--navy);font-weight:700;">${fmtCash(s.pricePerGram21!=null? s.pricePerGram21 : (s.pricePerGram*BASE_KARAT/s.karat))}</td>
+              <td class="right num" style="font-weight:700;">${fmtCash(s.totalCash)}</td>
+              <td>${esc(s.employee||'—')}</td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لا توجد عمليات شراء بعد</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -980,23 +1103,50 @@ function openScrapModal(){
         <div class="field"><label>اسم العميل (اختياري)</label><input id="sc-name" placeholder="اسم العميل"></div>
         <div class="row">
           <div class="field"><label>العيار</label>
-            <select id="sc-karat">${state.karats.map(k=>`<option value="${k}">عيار ${k}</option>`).join('')}</select>
+            <select id="sc-karat" onchange="applyScrapKaratPrice()">${state.karats.map(k=>`<option value="${k}">عيار ${k}</option>`).join('')}</select>
           </div>
           <div class="field"><label>الوزن (جم)</label><input type="number" id="sc-weight" min="0" step="0.001" placeholder="0.000"></div>
         </div>
-        <div class="field"><label>سعر الجرام</label><input type="number" id="sc-price" min="0" step="0.01" placeholder="0.00" oninput="recalcScrapTotal()"></div>
-        <div class="field"><label>الإجمالي</label><input id="sc-total" readonly value="0.00"></div>
+        <div class="row">
+          <div class="field"><label>سعر الجرام (من الأسعار المحددة)</label><input type="number" id="sc-price" min="0" step="0.01" placeholder="0.00" oninput="recalcScrapTotal()"></div>
+          <div class="field"><label>الإجمالي</label><input id="sc-total" readonly value="0.00"></div>
+        </div>
+        <div class="field"><label>سعر الجرام محوّل لعيار ${BASE_KARAT} (الإجمالي ÷ الوزن)</label>
+          <input id="sc-price21" readonly value="0.00" style="font-weight:800;color:var(--navy);"></div>
+        <div class="field"><label>اسم الموظف اللي عمل عملية الشراء</label>
+          <input id="sc-employee" list="sc-employee-list" placeholder="اسم الموظف">
+          <datalist id="sc-employee-list">${(state.employees||[]).map(e=>`<option value="${esc(e)}"></option>`).join('')}</datalist>
+        </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
           <button class="btn btn-gold" onclick="submitScrap()">تسجيل الشراء</button>
         </div>
       </div>
     </div>`;
+  applyScrapKaratPrice();
+  const w = document.getElementById('sc-weight'); if(w) w.focus();
+}
+function setGoldPrice(karat, val){
+  mutate(()=>{
+    state.settings = state.settings||{}; state.settings.goldPrices = state.settings.goldPrices||{};
+    state.settings.goldPrices[karat] = parseFloat(val)||0;
+  }, 'تم حفظ سعر عيار '+karat);
+}
+function applyScrapKaratPrice(){
+  const k = parseFloat(document.getElementById('sc-karat').value);
+  const el = document.getElementById('sc-price');
+  const set = Number((state.settings.goldPrices||{})[k]||0);
+  if(el) el.value = set? set.toFixed(2) : '';
+  recalcScrapTotal();
 }
 function recalcScrapTotal(){
   const w = parseFloat(document.getElementById('sc-weight').value)||0;
   const p = parseFloat(document.getElementById('sc-price').value)||0;
-  document.getElementById('sc-total').value = (w*p).toFixed(2);
+  const k = parseFloat(document.getElementById('sc-karat').value)||BASE_KARAT;
+  const total = w*p;
+  document.getElementById('sc-total').value = total.toFixed(2);
+  const el21 = document.getElementById('sc-price21');
+  if(el21) el21.value = (w>0? (total/w)*(BASE_KARAT/k) : 0).toFixed(2);
 }
 document.addEventListener('input', (e)=>{
   if(e.target && e.target.id==='sc-weight') recalcScrapTotal();
@@ -1006,12 +1156,16 @@ function submitScrap(){
   const weight = parseFloat(document.getElementById('sc-weight').value)||0;
   const price = parseFloat(document.getElementById('sc-price').value)||0;
   const name = document.getElementById('sc-name').value.trim();
+  const employee = document.getElementById('sc-employee').value.trim();
   if(weight<=0 || price<=0){ toast('أدخل الوزن والسعر بشكل صحيح'); return; }
   const total = weight*price;
+  const price21 = (total/weight)*(BASE_KARAT/karat);
   mutate(()=>{
     state.treasury.cash -= total;
     state.treasury.gold[karat] = (state.treasury.gold[karat]||0) + weight;
-    state.scrapPurchases.push({id:uid('scrap'), no:state.counters.scrap++, date:todayStr(), customerName:name, karat, weight, pricePerGram:price, totalCash:total});
+    state.scrapPurchases.push({id:uid('scrap'), no:state.counters.scrap++, date:todayStr(), createdAt:new Date().toISOString(),
+      customerName:name, karat, weight, pricePerGram:price, pricePerGram21:price21, totalCash:total, employee});
+    if(employee){ state.employees = state.employees||[]; if(!state.employees.includes(employee)) state.employees.push(employee); }
   }, 'تم تسجيل عملية الشراء');
   closeModal();
 }
@@ -1336,8 +1490,8 @@ function renderMerchants(){
             <th>اسم التاجر</th>
             <th style="width:100px;">العيار الأساسي</th>
             <th style="width:130px;">رقم الهاتف</th>
-            <th class="right" style="width:170px;">الرصيد النقدي</th>
-            <th style="width:220px;">رصيد الذهب</th>
+            <th class="right" style="width:150px;">الرصيد النقدي</th>
+            <th style="width:170px;">رصيد الذهب (ع21)</th>
             <th style="width:230px;"></th>
           </tr>
         </thead>
@@ -1398,11 +1552,20 @@ function renderMerchantRow(m){
       <td style="font-weight:700;">${esc(m.name)}</td>
       <td><span class="pill pill-gold">عيار ${merchantKarat(m)}</span></td>
       <td class="muted num">${m.phone? esc(m.phone) : '—'}</td>
-      <td class="right">
-        <span class="pill ${cashTone}" style="margin-left:6px;">${cashLabel}</span>
-        <span class="mono num" style="font-weight:700;">${fmtCash(Math.abs(m.balanceCash))}</span>
-      </td>
-      <td>${goldRows.length? `<div class="kv-inline">${goldRows.map(g=>`<span class="kv-chip">ع${g.k}: <b>${g.w.toFixed(3)}</b></span>`).join('')}</div>` : `<span class="muted" style="font-size:12px;">—</span>`}</td>
+      <td class="right">${(()=>{
+        const v = Number(m.balanceCash)||0;
+        const color = v>0? 'var(--green)' : v<0? 'var(--red)' : 'var(--muted-2)';
+        const txt = Math.abs(v).toFixed(2);
+        return `<span class="valwrap"><b class="num" style="color:${color};">${Number(txt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(txt)}</span>`;
+      })()}</td>
+      <td>${(()=>{
+        const g21 = goldTo21(m.balanceGold);
+        const color = g21>0? 'var(--green)' : g21<0? 'var(--red)' : 'var(--muted-2)';
+        const txt = Math.abs(g21).toFixed(3);
+        const detail = goldRows.length? goldRows.map(g=>'ع'+g.k+': '+g.w.toFixed(3)).join(' · ') : '';
+        return `<span class="valwrap"><b class="num" style="color:${color};">${txt}</b>${copyBtn(txt)}</span>`
+          + (detail? `<div class="muted" style="font-size:10.5px;margin-top:2px;">${esc(detail)}</div>` : '');
+      })()}</td>
       <td>
         <div style="display:flex;gap:6px;justify-content:flex-end;">
           <button class="btn btn-sm btn-ghost" onclick="openCPModal('collect','${m.id}')">↙ تحصيل</button>
@@ -1430,18 +1593,16 @@ function renderMerchantSummary(){
   const totalCash = rows.reduce((s,m)=> s + (m.balanceCash||0), 0);
 
   function goldCell(v){
-    v = v||0;
-    if(v===0) return `<span class="pill pill-muted">متزن</span>`;
-    const tone = v>0? 'pill-green' : 'pill-red';
-    const label = v>0? 'لنا' : 'علينا';
-    return `<span class="pill ${tone}">${label} · ${Math.abs(v).toFixed(3)} جم</span>`;
+    v = Number(v)||0;
+    const txt = Math.abs(v).toFixed(3);
+    const color = v>0? 'var(--green)' : v<0? 'var(--red)' : 'var(--muted-2)';
+    return `<span class="valwrap"><b class="num" style="color:${color};">${txt}</b>${copyBtn(txt)}</span>`;
   }
   function cashCell(v){
-    v = v||0;
-    if(v===0) return `<span class="pill pill-muted">متزن</span>`;
-    const tone = v>0? 'pill-green' : 'pill-red';
-    const label = v>0? 'لنا' : 'علينا';
-    return `<span class="pill ${tone}">${label} · ${fmtCash(Math.abs(v))}</span>`;
+    v = Number(v)||0;
+    const txt = Math.abs(v).toFixed(2);
+    const color = v>0? 'var(--green)' : v<0? 'var(--red)' : 'var(--muted-2)';
+    return `<span class="valwrap"><b class="num" style="color:${color};">${Number(txt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(txt)}</span>`;
   }
 
   return `
@@ -1452,11 +1613,11 @@ function renderMerchantSummary(){
     <div class="grid grid-2" style="margin-bottom:18px;">
       <div class="card stat ${totalGold>0?'pos':totalGold<0?'neg':''}">
         <div class="label"><span>إجمالي رصيد الذهب لكل التجار (بعيار ${BASE_KARAT})</span></div>
-        <div class="value">${totalGold===0? 'متزن' : (totalGold>0?'لنا: ':'علينا: ') + Math.abs(totalGold).toFixed(3) + ' جم'}</div>
+        <div class="value" style="display:flex;align-items:center;gap:10px;">${Math.abs(totalGold).toFixed(3)}${copyBtn(Math.abs(totalGold).toFixed(3))}</div>
       </div>
       <div class="card stat ${totalCash>0?'pos':totalCash<0?'neg':''}">
         <div class="label"><span>إجمالي الرصيد النقدي لكل التجار</span></div>
-        <div class="value">${totalCash===0? 'متزن' : (totalCash>0?'لنا: ':'علينا: ') + fmtCash(Math.abs(totalCash))}</div>
+        <div class="value" style="display:flex;align-items:center;gap:10px;">${Math.abs(totalCash).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${copyBtn(Math.abs(totalCash).toFixed(2))}</div>
       </div>
     </div>
 
@@ -1904,26 +2065,54 @@ function renderInvoiceList(kind){
         <button class="btn btn-gold" style="white-space:nowrap;" onclick="goToAddMerchant()">+ إضافة تاجر دلوقتي</button>
       </div>`}
     <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>رقم</th><th>التاريخ</th><th>التاجر</th><th>الأصناف</th><th class="right">إجمالي الوزن</th><th>طريقة الدفع</th><th class="right">${isPurchase?'إجمالي الأجر':'إجمالي الأجر / الإجمالي'}</th></tr></thead>
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:55px;">رقم</th>
+          <th style="width:95px;">التاريخ</th>
+          <th style="width:160px;">التاجر</th>
+          <th>الأصناف</th>
+          <th class="right" style="width:110px;">إجمالي الوزن</th>
+          <th class="right total-col" style="width:150px;">إجمالي الأجر</th>
+          <th style="width:110px;">طريقة الدفع</th>
+          ${isPurchase?'<th style="width:150px;"></th>':''}
+        </tr></thead>
         <tbody>
-        ${sorted.length? sorted.map(inv=>`
+        ${sorted.length? sorted.map(inv=>{
+          const pills = (inv.items||[]).map(i=>{
+            const itName = i.itemTypeId? state.itemTypes.find(x=>x.id===i.itemTypeId) : null;
+            return `<span class="pill pill-gold" style="margin:1px;">${itName?esc(itName.name)+' · ':''}ع${i.karat} · ${i.weight}جم</span>`;
+          });
+          const shown = pills.slice(0,4).join('') + (pills.length>4? `<span class="pill pill-muted" style="margin:1px;">و ${pills.length-4} غيرها</span>` : '');
+          const due = inv.totalCash||0;
+          const payPill = due<=0? `<span class="pill pill-muted">بالوزن فقط</span>`
+            : `<span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع كامل':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>`;
+          const hrs = invoiceHoursLeft(inv);
+          const sold = invoiceSoldPieces(inv);
+          const canChange = isPurchase && hrs>0 && sold===0;
+          const why = hrs<=0? 'عدّى أكتر من ٢٤ ساعة' : (sold? 'فيه قطع اتباعت':'');
+          return `
           <tr>
             <td class="mono">#${inv.no}</td>
-            <td class="muted num">${fmtDate(inv.date)}</td>
+            <td class="muted num">${fmtDateRep(inv.date)}</td>
             <td>${esc(merchantName(inv.merchantId))}</td>
-            <td>${inv.items.map(i=>{
-              const itName = i.itemTypeId? state.itemTypes.find(x=>x.id===i.itemTypeId) : null;
-              return `<span class="pill pill-gold" style="margin:1px;">${itName?esc(itName.name)+' · ':''}ع${i.karat} · ${i.weight}جم</span>`;
-            }).join('')}</td>
+            <td>${shown}</td>
             <td class="right num">${(inv.totalWeight!=null? inv.totalWeight : inv.items.reduce((s,i)=>s+i.weight,0)).toFixed(3)} جم</td>
-            <td>${(()=>{
-              const due = inv.totalCash||0;
-              if(due<=0) return `<span class="pill pill-muted">بالوزن فقط</span>`;
-              return `<span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع كامل':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>`;
-            })()}</td>
-            <td class="right num">${fmtCash(inv.totalCash)}</td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لا توجد فواتير بعد</td></tr>`}
+            <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
+              <b class="num" style="font-size:15px;color:var(--navy);">${Number(inv.totalCash||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>
+              ${copyBtn(Number(inv.totalCash||0).toFixed(2))}
+            </span></td>
+            <td>${payPill}</td>
+            ${isPurchase? `<td>
+              <div style="display:flex;gap:6px;justify-content:flex-end;">
+                ${canChange? `
+                  <button class="btn btn-sm btn-ghost" onclick="editPurchaseInvoice('${inv.id}')">تعديل</button>
+                  <button class="btn btn-sm btn-danger" onclick="deletePurchaseInvoice('${inv.id}')">حذف</button>
+                  <span class="muted" style="font-size:10.5px;align-self:center;">${Math.floor(hrs)} س</span>
+                ` : `<span class="muted" style="font-size:11px;">مقفولة · ${esc(why)}</span>`}
+              </div>
+            </td>`:''}
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="${isPurchase?8:7}">لا توجد فواتير بعد</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1950,6 +2139,7 @@ function goToAddMerchant(){
 }
 function openPurchaseBuilder(){
   if(!state.merchants.length){ toast('ضيف تاجر الأول — فتحتلك شاشة إضافة تاجر'); goToAddMerchant(); return; }
+  pbEditId=null; pbEditNo=null; pbEditDate=null; pbEditCreatedAt=null;
   resetPurchaseBuilder();
   goto('purchase-builder');
 }
@@ -1975,7 +2165,10 @@ function renderPurchaseBuilder(){
 
   return `
     <div class="pagehead">
-      <div><h1>فاتورة شراء من تاجر</h1><p>اختر الكود من الكتالوج على اليمين، ادخل الوزن واضغط Enter — الأجر بيتحسب تلقائيًا (الوزن × أجر الجرام) والقطعة بتنزل بباركود خاص بيها</p></div>
+      <div>
+        <h1>${pbEditId? ('تعديل فاتورة شراء #'+pbEditNo) : 'فاتورة شراء من تاجر'}</h1>
+        <p>${pbEditId? 'انت بتعدّل فاتورة متسجلة — القيد القديم اتشال، ولما تحفظ هيتسجل بالبيانات الجديدة بنفس رقم الفاتورة' : 'اختر الكود من الكتالوج على اليمين، ادخل الوزن واضغط Enter — الأجر بيتحسب تلقائيًا (الوزن × أجر الجرام) والقطعة بتنزل بباركود خاص بيها'}</p>
+      </div>
       <button class="btn btn-ghost" onclick="goto('purchases')">← رجوع لقائمة الفواتير</button>
     </div>
 
@@ -2209,6 +2402,93 @@ function printPBBarcodes(){
   printBarcodes(pb.items.map(i=>({no:i.serial, karat:i.karat, weight:i.weight, barcodeValue:i.barcodeValue})));
 }
 
+let pbEditId=null, pbEditNo=null, pbEditDate=null, pbEditCreatedAt=null;
+
+const EDIT_WINDOW_MS = 24*60*60*1000;
+function invoiceCreatedMs(inv){
+  const t = Date.parse(inv.createdAt || (String(inv.date).slice(0,10)+'T00:00:00'));
+  return isNaN(t)? 0 : t;
+}
+function invoiceHoursLeft(inv){
+  return (EDIT_WINDOW_MS - (Date.now() - invoiceCreatedMs(inv))) / 3600000;
+}
+function invoiceWithinWindow(inv){ return invoiceHoursLeft(inv) > 0; }
+function invoiceSoldPieces(inv){
+  return state.pieces.filter(p=> p.invoiceId===inv.id && p.sold).length;
+}
+
+/* عكس قيد فاتورة الشراء بالكامل (يستخدم في الحذف والتعديل) */
+function revertPurchaseInvoice(inv){
+  const m = merchantById(inv.merchantId);
+  const making = (inv.totalMaking!=null? inv.totalMaking : inv.totalCash)||0;
+  const paid = inv.amountPaidNow||0;
+  const byKarat = {};
+  (inv.items||[]).forEach(it=>{ byKarat[it.karat] = (byKarat[it.karat]||0) + (Number(it.weight)||0); });
+  Object.keys(byKarat).forEach(k=>{
+    state.treasury.gold[k] = (state.treasury.gold[k]||0) - byKarat[k];
+    if(m && inv.settleMode==='weight') m.balanceGold[k] = (m.balanceGold[k]||0) + byKarat[k];
+  });
+  state.treasury.cash += paid;
+  if(m) m.balanceCash += (making - paid);
+  state.pieces = state.pieces.filter(p=> p.invoiceId !== inv.id);
+  state.purchaseInvoices = state.purchaseInvoices.filter(x=> x.id !== inv.id);
+}
+
+function guardInvoiceChange(inv, action){
+  if(!invoiceWithinWindow(inv)){
+    toast('مينفعش '+action+' — عدّى أكتر من ٢٤ ساعة على الفاتورة');
+    return false;
+  }
+  const sold = invoiceSoldPieces(inv);
+  if(sold){
+    toast('مينفعش '+action+' — فيه '+sold+' قطعة من الفاتورة دي اتباعت بالفعل');
+    return false;
+  }
+  return true;
+}
+
+function deletePurchaseInvoice(id){
+  const inv = state.purchaseInvoices.find(x=>x.id===id);
+  if(!inv) return;
+  if(!guardInvoiceChange(inv,'الحذف')) return;
+  const w = (inv.totalWeight!=null? inv.totalWeight : (inv.items||[]).reduce((a,b)=>a+b.weight,0))||0;
+  showConfirmModal('حذف فاتورة الشراء رقم #'+inv.no+'؟ هيترجع '+w.toFixed(3)+' جم من المخزون ويتلغي قيدها على حساب التاجر، والقطع بتاعتها هتتشال.', ()=>{
+    mutate(()=>{ revertPurchaseInvoice(inv); }, 'تم حذف الفاتورة وإلغاء قيدها');
+    closeModal();
+  }, {confirmLabel:'حذف الفاتورة'});
+}
+
+function editPurchaseInvoice(id){
+  const inv = state.purchaseInvoices.find(x=>x.id===id);
+  if(!inv) return;
+  if(!guardInvoiceChange(inv,'التعديل')) return;
+  const pieces = state.pieces.filter(p=>p.invoiceId===inv.id);
+  pbEditId = inv.id; pbEditNo = inv.no; pbEditDate = inv.date; pbEditCreatedAt = inv.createdAt || new Date().toISOString();
+  pb = {
+    merchantId: inv.merchantId,
+    karat: inv.karat || merchantKarat(merchantById(inv.merchantId)),
+    search:'', classFilter:'', selectedProductId:null,
+    items: (inv.items||[]).map((it,i)=>{
+      const pc = pieces[i];
+      const prod = it.productCode? state.products.find(x=>x.code===it.productCode) : null;
+      const itn = state.itemTypes.find(x=>x.id===it.itemTypeId);
+      const cln = state.classifications.find(x=>x.id===it.classificationId);
+      return {
+        tempId: uid('dft'), productId: prod? prod.id : (pc? pc.productId : null), code: it.productCode||'—',
+        itemName: itn? itn.name : '—', classificationName: cln? cln.name : '—',
+        itemTypeId: it.itemTypeId, classificationId: it.classificationId, priceCategoryId: it.priceCategoryId,
+        price: it.price||it.makingPerGram||0, making: it.making!=null? it.making : (it.weight*(it.price||0)),
+        weight: it.weight, karat: it.karat, lineTotal: it.making!=null? it.making : (it.weight*(it.price||0)),
+        serial: pc? pc.no : state.counters.piece, barcodeValue: pc? pc.barcodeValue : buildBarcodeValue(it.karat, it.weight, state.counters.piece)
+      };
+    }),
+    serialCursor: state.counters.piece
+  };
+  // شيل القيد القديم دلوقتي عشان الشاشة تبان بالأرصدة الصح، وهيتسجل من جديد عند الحفظ
+  mutate(()=>{ revertPurchaseInvoice(inv); }, 'فتحت الفاتورة #'+inv.no+' للتعديل');
+  goto('purchase-builder');
+}
+
 function submitPurchaseBuilderInvoice(){
   if(!pb.items.length){ toast('أضف قطعة واحدة على الأقل'); return; }
   if(!pb.merchantId){ toast('اختر التاجر'); return; }
@@ -2231,7 +2511,12 @@ function submitPurchaseBuilderInvoice(){
     m.balanceCash -= (totalMaking - paid);
 
     const invItems = items.map(it=>({karat:it.karat, weight:it.weight, price:it.price, makingPerGram:it.price, making:it.making, total:it.lineTotal, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, productCode:it.code}));
-    const rec = {id:uid('purchase'), no: state.counters.purchase++, date:todayStr(), merchantId, karat, items:invItems,
+    const editing = !!pbEditId;
+    const rec = {id: editing? pbEditId : uid('purchase'),
+      no: editing? pbEditNo : state.counters.purchase++,
+      date: editing? (pbEditDate||todayStr()) : todayStr(),
+      createdAt: editing? pbEditCreatedAt : new Date().toISOString(),
+      merchantId, karat, items:invItems,
       totalCash: totalMaking, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid};
     state.purchaseInvoices.push(rec);
 
@@ -2239,8 +2524,8 @@ function submitPurchaseBuilderInvoice(){
       state.pieces.push({id:uid('pc'), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
     });
     state.counters.piece = finalSerialCursor;
-  }, 'تم حفظ فاتورة الشراء');
-  pb = null;
+  }, pbEditId? ('تم حفظ تعديل الفاتورة #'+pbEditNo) : 'تم حفظ فاتورة الشراء');
+  pb = null; pbEditId=null; pbEditNo=null; pbEditDate=null; pbEditCreatedAt=null;
   goto('purchases');
 }
 
@@ -2718,7 +3003,7 @@ function renderSettlements(){
             <td class="mono">#${s.no}</td>
             <td class="muted num">${fmtDate(s.date)}</td>
             <td>${esc(merchantName(s.merchantId))}</td>
-            <td><span class="pill ${s.type==='debit'?'pill-green':'pill-red'}">${s.type==='debit'?'مدين على التاجر':'دائن لصالح التاجر'}</span></td>
+            <td><span class="pill ${s.type==='debit'?'pill-green':'pill-red'}">${s.type==='debit'?'مدين — له':'دائن — عليه'}</span></td>
             <td class="num">${s.cash? fmtCash(s.cash):'—'}</td>
             <td class="num">${s.karat && s.weight? 'ع'+s.karat+' · '+fmtW(s.weight) : '—'}</td>
             <td class="muted">${esc(s.note||'—')}</td>
@@ -2735,14 +3020,14 @@ function openSettlementModal(){
     <div class="modal-bg" onclick="if(event.target===this)closeModal()">
       <div class="modal">
         <h2>تسوية حساب تاجر</h2>
-        <div class="hint">"مدين على التاجر" يزيد ما لنا عنده — "دائن لصالح التاجر" يزيد ما علينا له</div>
+        <div class="hint">مدين — له: يزيد ما لنا عنده · دائن — عليه: يزيد ما علينا له</div>
         <div class="field"><label>التاجر</label>
           <select id="st-merchant">${state.merchants.map(m=>`<option value="${m.id}">${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
         </div>
         <div class="field"><label>نوع التسوية</label>
           <select id="st-type">
-            <option value="debit">مدين على التاجر (له علينا أقل / لنا عليه أكثر)</option>
-            <option value="credit">دائن لصالح التاجر (لنا عليه أقل / له علينا أكثر)</option>
+            <option value="debit">مدين — له</option>
+            <option value="credit">دائن — عليه</option>
           </select>
         </div>
         <div class="row">
