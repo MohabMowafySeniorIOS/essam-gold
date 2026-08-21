@@ -6,8 +6,30 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
+
+// مكان حفظ البيانات:
+// - محليًا: جنب server.js زي ما هو
+// - على الاستضافة (Railway وغيرها): حدد متغير البيئة DATA_DIR على مسار الـ Volume الدائم
+//   مثال: DATA_DIR=/data  — كده البيانات مش هتتمسح مع كل ديبلوي
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// اتأكد إن مجلد البيانات موجود
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+
+// أول تشغيل بعد نقل المشروع لـ Volume: لو فيه data.json قديم جنب server.js
+// وملفش نسخة في مجلد البيانات الجديد، ننقله تلقائيًا عشان مايضيعش
+(function migrateLegacyData() {
+  if (DATA_DIR === __dirname) return;
+  const legacy = path.join(__dirname, 'data.json');
+  try {
+    if (fs.existsSync(legacy) && !fs.existsSync(DATA_FILE)) {
+      fs.copyFileSync(legacy, DATA_FILE);
+      console.log('تم نقل data.json القديم إلى مجلد البيانات الدائم');
+    }
+  } catch (e) { console.error('تعذر نقل ملف البيانات القديم', e); }
+})();
 
 function readState() {
   try {
@@ -19,9 +41,12 @@ function readState() {
 }
 
 function writeState(state) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   // كتابة آمنة: نكتب في ملف مؤقت ثم نستبدل الملف الأصلي، لتفادي تلف البيانات لو حصل قطع كهرباء أثناء الكتابة
   const tmpFile = DATA_FILE + '.tmp';
   fs.writeFileSync(tmpFile, JSON.stringify(state, null, 2), 'utf8');
+  // نسخة احتياطية للملف السابق قبل ما يتستبدل
+  try { if (fs.existsSync(DATA_FILE)) fs.copyFileSync(DATA_FILE, DATA_FILE + '.bak'); } catch (e) {}
   fs.renameSync(tmpFile, DATA_FILE);
 }
 
@@ -70,6 +95,19 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  // تنزيل نسخة احتياطية كملف JSON
+  if (req.url.startsWith('/api/backup')) {
+    const raw = (() => { try { return fs.readFileSync(DATA_FILE, 'utf8'); } catch (e) { return '{}'; } })();
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="goldshop-backup-' + stamp + '.json"',
+      'Content-Length': Buffer.byteLength(raw),
+    });
+    res.end(raw);
+    return;
+  }
+
   if (req.url.startsWith('/api/state')) {
     if (req.method === 'GET') {
       const state = readState();
@@ -113,5 +151,6 @@ server.listen(PORT, () => {
   console.log('  دفتر الصائغ — إدارة حسابات محل الذهب');
   console.log('  السيرفر شغال على: http://localhost:' + PORT);
   console.log('  البيانات بتتحفظ في: ' + DATA_FILE);
+  console.log('  DATA_DIR = ' + DATA_DIR + (process.env.DATA_DIR ? '  (من متغير البيئة ✓)' : '  (افتراضي — على الاستضافة حدّد DATA_DIR على مسار Volume)'));
   console.log('==============================================');
 });

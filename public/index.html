@@ -90,6 +90,14 @@
   .navitem.active{
     background:#fff;color:#17406e;border-color:#fff;font-weight:700;
   }
+  .nav-version{margin-top:auto;padding:14px 12px 2px;font-size:10.5px;color:rgba(255,255,255,.42);
+    text-align:center;letter-spacing:.3px;flex:none;}
+  .navitem.parent{cursor:pointer;}
+  .nav-chev{margin-inline-start:auto;font-size:11px;opacity:.75;transition:transform .18s;}
+  .navitem.parent.open .nav-chev{transform:rotate(180deg);}
+  .navsub{display:flex;flex-direction:column;gap:2px;margin:2px 0 4px;
+    border-inline-start:2px solid rgba(255,255,255,.16);padding-inline-start:6px;margin-inline-start:14px;}
+  .navitem.navchild{font-size:12.5px;padding:7px 10px;}
   .navitem .badge{
     margin-inline-start:auto;background:var(--red);color:#fff;font-size:10.5px;
     padding:1px 7px;border-radius:20px;font-weight:700;
@@ -347,6 +355,163 @@
   .ret-head h1{color:var(--red);}
   .ret-card{border-right:4px solid var(--red);}
 
+
+  /* ================= الموبايل والتابلت ================= */
+  #mobile-bar{display:none;}
+  #sidebar-overlay{display:none;}
+  .nav-close{display:none;}
+
+  @media (max-width: 980px){
+    /* شريط علوي ثابت */
+    #mobile-bar{
+      display:flex;align-items:center;gap:12px;
+      position:sticky;top:0;z-index:45;
+      background:#17406e;color:#fff;padding:10px 14px;
+      box-shadow:0 2px 10px rgba(16,44,77,.25);
+    }
+    #mb-burger{
+      background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:8px;
+      width:40px;height:38px;display:flex;flex-direction:column;justify-content:center;
+      align-items:center;gap:4px;cursor:pointer;padding:0;flex:none;
+    }
+    #mb-burger span{display:block;width:18px;height:2px;background:#fff;border-radius:2px;}
+    #mb-title{flex:1;font-family:'Almarai',sans-serif;font-weight:800;font-size:15px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #mb-brand{
+      width:34px;height:34px;border-radius:8px;background:#fff;color:#17406e;flex:none;
+      display:flex;align-items:center;justify-content:center;font-family:'Almarai',sans-serif;
+      font-weight:800;font-size:16px;
+    }
+
+    /* القائمة الجانبية تبقى درج منزلق */
+    #sidebar{
+      position:fixed;top:0;right:0;bottom:0;height:100dvh;width:272px;max-width:86vw;
+      z-index:60;transform:translateX(106%);transition:transform .22s ease;
+      box-shadow:-10px 0 30px rgba(0,0,0,.35);padding:16px 12px 24px;
+    }
+    body.nav-open #sidebar{transform:translateX(0);}
+    #sidebar-overlay{
+      position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:55;
+      opacity:0;pointer-events:none;transition:opacity .2s ease;display:block;
+    }
+    body.nav-open #sidebar-overlay{opacity:1;pointer-events:auto;}
+    body.nav-open{overflow:hidden;}
+    .navitem{padding:11px 12px;font-size:14px;}
+    .nav-close{
+      display:flex;align-items:center;justify-content:center;
+      width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.12);
+      border:none;color:#fff;font-size:17px;cursor:pointer;flex:none;margin-inline-start:auto;
+    }
+
+    /* المحتوى */
+    #main{padding:14px 12px 90px;max-width:100%;}
+    .pagehead{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:16px;}
+    .pagehead h1{font-size:19px;}
+    .pagehead p{font-size:12.5px;}
+    .pagehead > div[style*="display:flex"]{width:100%;}
+    .pagehead .btn,.pagehead a.btn{flex:1;text-align:center;}
+
+    .grid-4,.grid-3,.grid-2{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .card{padding:14px;}
+    .stat .value{font-size:19px;}
+    .section-title{margin:20px 0 10px;font-size:14px;}
+
+    .row{flex-direction:column;gap:0;}
+    .searchbar{flex-direction:column;}
+    .searchbar input,.searchbar select{max-width:100%;}
+    .filterbar .f{min-width:100%;}
+    .filterbar .f.auto{min-width:100%;}
+    .filterbar .spacer{display:none;}
+    .filterbar .btn{width:100%;}
+
+    /* منع الزووم التلقائي على iOS */
+    input,select,textarea{font-size:16px;padding:10px 11px;}
+    .btn{padding:10px 14px;}
+    .btn-sm{padding:8px 11px;font-size:12.5px;}
+
+    /* الجداول: تمرير أفقي سلس + تلميح */
+    .tbl-wrap{-webkit-overflow-scrolling:touch;}
+    table.tl-table{min-width:760px;}
+    tbody td,thead th{padding:9px 8px;}
+
+    /* المودالات: تطلع من تحت زي شيت الموبايل */
+    .modal-bg{padding:0;align-items:flex-end;}
+    .modal{max-width:100%;width:100%;max-height:92dvh;border-radius:16px 16px 0 0;padding:18px 16px 22px;}
+    .modal.wide{max-width:100%;}
+    .modal-actions{position:sticky;bottom:-22px;background:var(--panel);padding-bottom:6px;flex-wrap:wrap;}
+    .modal-actions .btn{flex:1;min-width:110px;}
+    .item-row{grid-template-columns:1fr 1fr auto !important;}
+
+    /* لوحة التحكم */
+    .homeswitch{gap:6px;}
+    .hs-btn{flex:1;padding:10px 8px;font-size:12.5px;}
+    .sc-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .sc-card{padding:12px 10px;gap:9px;flex-direction:column;text-align:center;}
+    .sc-ic{width:36px;height:36px;font-size:19px;}
+    .sc-lbl{font-size:12px;line-height:1.35;}
+
+    /* المربعات */
+    .sq-wrap{padding:8px;}
+    .sq-f{min-width:calc(50% - 5px);flex:1 1 calc(50% - 5px);}
+    .sq-f.grow{flex:1 1 100%;min-width:100%;}
+    .sq-f.auto{flex:1 1 100%;min-width:100%;}
+    .sq-f.auto .btn{width:100%;}
+    .sq-stat{min-width:calc(50% - 5px);}
+    .sq-addlbl{flex:1 1 100%;text-align:center;}
+
+    /* تقرير النقدية */
+    .report-sheet{padding:12px 10px 18px;}
+    .report-sheet .rep-frow{width:100%;}
+    .report-sheet .rep-frow > label{width:80px;font-size:12.5px;}
+    .report-sheet .rep-frow > input,.report-sheet .rep-frow > select{width:100%;flex:1;}
+    .report-sheet .rep-totrow > b{width:auto;flex:1;}
+    .report-sheet table.rep-table{display:block;overflow-x:auto;white-space:nowrap;}
+
+    .tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+    .tabs::-webkit-scrollbar{height:0;}
+    .tab{flex:none;}
+    .kv-chip{font-size:11.5px;}
+    #save-indicator{bottom:8px;left:8px;}
+  }
+
+  @media (max-width: 600px){
+    /* كروت الأرقام تفضل خانتين عشان متطولش الصفحة، والكروت الكبيرة تبقى عرض كامل */
+    .grid-4,.grid-3{grid-template-columns:repeat(2,1fr);gap:8px;}
+    .grid-2{grid-template-columns:1fr;}
+    .card.stat{padding:11px 12px;}
+    .stat .label{font-size:11px;margin-bottom:5px;}
+    .stat .value{font-size:16.5px;}
+    .stat .value small{font-size:11px;}
+    .sc-grid{grid-template-columns:repeat(2,1fr);}
+    .sq-f{min-width:calc(50% - 4px);flex:1 1 calc(50% - 4px);}
+    .sq-stat{min-width:100%;flex:1 1 100%;}
+    .pagehead h1{font-size:17.5px;}
+    .modal h2{font-size:15.5px;}
+    table.grid-table{display:block;overflow-x:auto;white-space:nowrap;}
+  }
+
+  @media (max-width: 380px){
+    .sc-grid{grid-template-columns:1fr;}
+    .sc-card{flex-direction:row;text-align:right;}
+  }
+
+
+  /* ====== أسعار الذهب ====== */
+  .gp-main{border-top:3px solid var(--navy);}
+  .gp-head{font-family:'Almarai';font-weight:800;font-size:15px;margin-bottom:14px;color:var(--navy);}
+  .gp-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .gp-box{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel-2);}
+  .gp-box label{font-size:12px;font-weight:700;margin-bottom:8px;}
+  .gp-box input{font-family:'Almarai';font-weight:800;font-size:20px;text-align:left;padding:10px 12px;}
+  .gp-box.buy{border-color:#f0c2bc;background:var(--red-bg);}
+  .gp-box.buy label{color:#a5281c;}
+  .gp-box.buy input{color:var(--red);}
+  .gp-box.sell{border-color:#bfe0cc;background:var(--green-bg);}
+  .gp-box.sell label{color:var(--green);}
+  .gp-box.sell input{color:var(--green);}
+  .gp-box.spread input{color:var(--navy);background:#fff;}
+  @media(max-width:980px){ .gp-row{grid-template-columns:1fr;} }
+
   .valwrap{display:inline-flex;align-items:center;gap:6px;}
   .valwrap b{font-family:'Almarai';font-size:13.5px;}
   .copy-btn{
@@ -395,6 +560,12 @@
 </style>
 </head>
 <body>
+<div id="mobile-bar">
+  <button id="mb-burger" onclick="toggleNav()" aria-label="القائمة"><span></span><span></span><span></span></button>
+  <div id="mb-title">دفتر الصائغ</div>
+  <div id="mb-brand">ذ</div>
+</div>
+<div id="sidebar-overlay" onclick="closeNav()"></div>
 <div id="shell">
   <aside id="sidebar"></aside>
   <main id="main"></main>
@@ -406,12 +577,15 @@
 
 <script>
 /* ============================= STATE ============================= */
+const APP_VERSION = 'v2.7';
+const APP_BUILD = '2026-08-19';
 const DEFAULT_KARATS = [24,22,21,18,14,9];
 let state = null;
 let currentView = 'home';
 let uiState = { pendingTab:'pending', txtSearch:'', cpTab:'all', summaryKarat: 21, catalogTab:'classifications', pbShowNewCode:false,
   repFrom:'', repTo:'', repKind:'', repColsOpen:false,
   stmtMerchantId:null, stmtFrom:'', stmtTo:'', stmtOpen:{},
+  navOpen:{},
   repCols:{date:true, in:true, out:true, bal:true, kind:true, merchant:true, stmt:true, no:true} };
 
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
@@ -471,6 +645,16 @@ async function loadState(){
       if(!state.pieces) state.pieces=[];
       state.settings = Object.assign({shopName:'دفتر الصائغ', goldPrices:{}}, state.settings||{});
       state.settings.goldPrices = state.settings.goldPrices||{};
+      if(!state.settings.gold){
+        const legacy21 = Number(state.settings.goldPrices[21]||0);
+        state.settings.gold = {buy21: legacy21, sell21: legacy21, overrides:{}, updatedAt: legacy21? new Date().toISOString():''};
+        Object.keys(state.settings.goldPrices).forEach(k=>{
+          const v = Number(state.settings.goldPrices[k])||0;
+          const auto = legacy21 * (Number(k)/21);
+          if(v && Math.abs(v-auto)>0.005) state.settings.gold.overrides[k] = {buy:v};
+        });
+      }
+      if(!state.settings.gold.overrides) state.settings.gold.overrides = {};
       if(!state.employees) state.employees=[];
       ['customers','merchantReturns','customerSales','customerReturns','goldLots','manufactures'].forEach(k=>{ if(!state[k]) state[k]=[]; });
       if(!state.scrapStock) state.scrapStock = emptyGoldMap();
@@ -691,6 +875,12 @@ const NAV = [
   {group:'الحسابات', items:[
     {id:'settlements', label:'تسوية الحسابات', icon:'⇄'},
   ]},
+  {group:'الإعدادات', items:[
+    {id:'system-code', label:'System Code', icon:'⚙', children:[
+      {id:'gold-prices', label:'أسعار الذهب', icon:'💰'},
+      {id:'backup', label:'نسخة احتياطية', icon:'💾'},
+    ]},
+  ]},
 ];
 
 function renderSidebar(){
@@ -702,18 +892,63 @@ function renderSidebar(){
         <div class="name">دفتر الصائغ</div>
         <div class="sub">إدارة حسابات محل الذهب</div>
       </div>
+      <button class="nav-close" onclick="closeNav()" aria-label="إغلاق">✕</button>
     </div>`;
   NAV.forEach(g=>{
     html += `<div class="navgroup-label">${esc(g.group)}</div>`;
     g.items.forEach(it=>{
-      const active = currentView===it.id ? 'active':'';
       const badge = it.badgeKey==='pendingCount' && pendingCount>0 ? `<span class="badge">${pendingCount}</span>` : '';
+      if(it.children && it.children.length){
+        const childActive = it.children.some(c=>c.id===currentView);
+        const open = uiState.navOpen[it.id] || childActive || currentView===it.id;
+        const active = (currentView===it.id) ? 'active':'';
+        html += `<div class="navitem parent ${active} ${open?'open':''}" onclick="toggleNavGroup('${it.id}')">
+          <span class="ic">${it.icon}</span><span>${esc(it.label)}</span><span class="nav-chev">▾</span>
+        </div>`;
+        if(open){
+          html += `<div class="navsub">` + it.children.map(c=>`
+            <a class="navitem navchild ${currentView===c.id?'active':''}" href="${viewHref(c.id)}" onclick="return navClick(event,'${c.id}')">
+              <span class="ic">${c.icon}</span><span>${esc(c.label)}</span>
+            </a>`).join('') + `</div>`;
+        }
+        return;
+      }
+      const active = currentView===it.id ? 'active':'';
       html += `<a class="navitem ${active}" href="${viewHref(it.id)}" onclick="return navClick(event,'${it.id}')">
         <span class="ic">${it.icon}</span><span>${esc(it.label)}</span>${badge}
       </a>`;
     });
   });
+  html += `<div class="nav-version">الإصدار ${APP_VERSION} · ${APP_BUILD}</div>`;
   document.getElementById('sidebar').innerHTML = html;
+  updateMobileTitle();
+}
+
+function toggleNavGroup(id){
+  uiState.navOpen[id] = !uiState.navOpen[id];
+  renderSidebar();
+}
+
+/* ====== قائمة الموبايل ====== */
+function toggleNav(){ document.body.classList.toggle('nav-open'); }
+function closeNav(){ document.body.classList.remove('nav-open'); }
+function currentViewLabel(){
+  for(const g of NAV){ for(const it of g.items){
+    if(it.id===currentView) return it.label;
+    if(it.children){ for(const c of it.children){ if(c.id===currentView) return c.label; } }
+  } }
+  const extra = {
+    'purchase-builder':'فاتورة شراء من تاجر', 'sale-builder':'فاتورة مبيعات لتاجر',
+    'customer-sale-builder':'فاتورة مبيعات لعميل', 'customer-return-builder':'مرتجع عميل',
+    'merchant-return-builder':'مرتجع من تاجر'
+  };
+  return extra[currentView] || 'دفتر الصائغ';
+}
+function updateMobileTitle(){
+  const el = document.getElementById('mb-title');
+  if(el) el.textContent = currentViewLabel();
+  const b = document.getElementById('mb-brand');
+  if(b) b.textContent = (shopName()||'ذ').trim().charAt(0) || 'ذ';
 }
 
 /* ====== الراوتنج: كل زرار بيودي لصفحة بقى لينك حقيقي — كليك يمين → فتح في تاب جديد ====== */
@@ -722,6 +957,7 @@ function navClick(ev, view){
   // لو المستخدم ضغط بزرار أوسط أو Ctrl/Cmd سيب المتصفح يفتح تاب جديد
   if(ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button===1)) return true;
   if(ev) ev.preventDefault();
+  closeNav();
   goto(view);
   return false;
 }
@@ -730,6 +966,7 @@ function navBtn(view, label, cls){
   return `<a class="btn ${cls||'btn-ghost'}" href="${viewHref(view)}" onclick="return navClick(event,'${view}')" style="display:inline-block;text-decoration:none;">${label}</a>`;
 }
 function goto(view){
+  if(currentView!==view && window.innerWidth<=980) window.scrollTo({top:0});
   currentView=view;
   const h = viewHref(view);
   if(location.hash !== h){ suppressHashRender = true; location.hash = h; }
@@ -802,6 +1039,9 @@ function render(){
     'lots-profit': renderLotsProfit,
     settlements: renderSettlements,
     transfers: renderTransfers,
+    'system-code': renderSystemCode,
+    'gold-prices': renderGoldPrices,
+    backup: renderBackup,
   };
   main.innerHTML = renderers[currentView] ? renderers[currentView]() : '<p>غير موجود</p>';
   if(pendingFocusId){
@@ -1176,16 +1416,37 @@ function renderScrap(){
       <button class="btn btn-gold" onclick="openScrapModal()">+ عملية شراء جديدة</button>
     </div>
 
-    <div class="section-title" style="margin-top:0;">سعر جرام الذهب المحدد (بيتحط تلقائيًا في الفاتورة)<div class="line"></div></div>
+    <div class="section-title" style="margin-top:0;">سعر جرام الذهب المحدد من System Code<div class="line"></div></div>
+    <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div class="kv-inline">
+        <span class="kv-chip">سعر الشراء ع${BASE_KARAT}: <b style="color:var(--red);">${fmtCash(goldBuyPrice(BASE_KARAT))}</b></span>
+        <span class="kv-chip">سعر البيع ع${BASE_KARAT}: <b style="color:var(--green);">${fmtCash(goldSellPrice(BASE_KARAT))}</b></span>
+        <span class="kv-chip">الفرق: <b>${fmtCash(goldSellPrice(BASE_KARAT)-goldBuyPrice(BASE_KARAT))}</b></span>
+      </div>
+      ${navBtn('gold-prices','⚙ تعديل الأسعار','btn-gold')}
+    </div>
     <div class="tbl-wrap" style="margin-bottom:18px;">
       <table class="grid-table">
-        <thead><tr>${state.karats.map(k=>`<th class="center">عيار ${k}</th>`).join('')}</tr></thead>
-        <tbody><tr>
-          ${state.karats.map(k=>`<td class="center"><input type="number" step="0.01" style="text-align:center;max-width:130px;margin:0 auto;"
-             value="${Number(state.settings.goldPrices[k]||0).toFixed(2)}" onchange="setGoldPrice(${k}, this.value)"></td>`).join('')}
-        </tr></tbody>
+        <thead><tr><th style="width:110px;">العيار</th>${state.karats.map(k=>`<th class="center">عيار ${k}</th>`).join('')}</tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:800;color:var(--red);">سعر الشراء</td>
+            ${state.karats.map(k=>`<td class="center num" style="font-weight:700;color:var(--red);">${fmtCash(goldBuyPrice(k))}</td>`).join('')}
+          </tr>
+          <tr>
+            <td style="font-weight:800;color:var(--green);">سعر البيع</td>
+            ${state.karats.map(k=>`<td class="center num" style="font-weight:700;color:var(--green);">${fmtCash(goldSellPrice(k))}</td>`).join('')}
+          </tr>
+        </tbody>
       </table>
     </div>
+    ${goldBuyPrice(BASE_KARAT)>0? '' : `<div class="card" style="margin-bottom:16px;border-color:var(--gold-dim);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:700;color:var(--gold-bright);margin-bottom:3px;">لسه مفيش سعر ذهب محدد</div>
+        <div class="muted" style="font-size:12.5px;">حدد سعر الشراء والبيع لعيار ${BASE_KARAT} من <b>System Code → أسعار الذهب</b> عشان السعر ينزل لوحده في شاشة الشراء.</div>
+      </div>
+      ${navBtn('gold-prices','⚙ حدد الأسعار دلوقتي','btn-gold')}
+    </div>`}
 
     <div class="section-title">عمليات شراء الكسر<div class="line"></div></div>
     <div class="tbl-wrap">
@@ -1223,9 +1484,12 @@ function openScrapModal(){
           <div class="field"><label>الوزن (جم)</label><input type="number" id="sc-weight" min="0" step="0.001" placeholder="0.000"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (من الأسعار المحددة)</label><input type="number" id="sc-price" min="0" step="0.01" placeholder="0.00" oninput="recalcScrapTotal()"></div>
-          <div class="field"><label>الإجمالي</label><input id="sc-total" readonly value="0.00"></div>
+          <div class="field"><label>سعر الجرام (نازل من سعر الشراء المحدد)</label><input type="number" id="sc-price" min="0" step="0.01" placeholder="0.00" oninput="recalcScrapTotal()"></div>
+          <div class="field"><label>الإجمالي (تقدر تكتبه وهيحسب سعر الجرام)</label>
+            <input type="number" min="0" step="0.01" id="sc-total" value="0.00" oninput="recalcScrapFromTotal()"></div>
         </div>
+        <div class="hint" id="sc-price-src" style="margin-top:-8px;margin-bottom:4px;"></div>
+        <div class="hint" id="sc-total-hint" style="margin-top:0;margin-bottom:12px;color:var(--navy);"></div>
         <div class="field"><label>سعر الجرام محوّل لعيار ${BASE_KARAT} (الإجمالي ÷ الوزن)</label>
           <input id="sc-price21" readonly value="0.00" style="font-weight:800;color:var(--navy);"></div>
         <div class="field"><label>اسم الموظف اللي عمل عملية الشراء</label>
@@ -1250,16 +1514,39 @@ function setGoldPrice(karat, val){
 function applyScrapKaratPrice(){
   const k = parseFloat(document.getElementById('sc-karat').value);
   const el = document.getElementById('sc-price');
-  const set = Number((state.settings.goldPrices||{})[k]||0);
+  const set = goldBuyPrice(k);   // شراء الكسر بيتم بسعر الشراء المحدد في System Code
   if(el) el.value = set? set.toFixed(2) : '';
+  const hint = document.getElementById('sc-price-src');
+  if(hint) hint.textContent = set? ('سعر الشراء المحدد لعيار '+k+' = '+fmtCash(set)+' — تقدر تعدله للعملية دي بس')
+                                 : 'مفيش سعر محدد لعيار '+k+' — حدده من System Code → أسعار الذهب';
   recalcScrapTotal();
 }
+/* الوزن × سعر الجرام ← الإجمالي */
 function recalcScrapTotal(){
   const w = parseFloat(document.getElementById('sc-weight').value)||0;
   const p = parseFloat(document.getElementById('sc-price').value)||0;
+  const totalEl = document.getElementById('sc-total');
+  if(totalEl && document.activeElement!==totalEl) totalEl.value = (w*p).toFixed(2);
+  updateScrap21();
+}
+/* الإجمالي ← سعر الجرام (لما تكتب الإجمالي بإيدك) */
+function recalcScrapFromTotal(){
+  const w = parseFloat(document.getElementById('sc-weight').value)||0;
+  const total = parseFloat(document.getElementById('sc-total').value)||0;
+  const priceEl = document.getElementById('sc-price');
+  const hint = document.getElementById('sc-total-hint');
+  if(w>0){
+    if(priceEl) priceEl.value = (total/w).toFixed(2);
+    if(hint) hint.textContent = 'سعر الجرام اتحسب من الإجمالي: ' + fmtCash(total/w);
+  } else if(hint){
+    hint.textContent = 'اكتب الوزن الأول عشان أقدر أحسب سعر الجرام من الإجمالي';
+  }
+  updateScrap21();
+}
+function updateScrap21(){
+  const w = parseFloat(document.getElementById('sc-weight').value)||0;
+  const total = parseFloat(document.getElementById('sc-total').value)||0;
   const k = parseFloat(document.getElementById('sc-karat').value)||BASE_KARAT;
-  const total = w*p;
-  document.getElementById('sc-total').value = total.toFixed(2);
   const el21 = document.getElementById('sc-price21');
   if(el21) el21.value = (w>0? (total/w)*(BASE_KARAT/k) : 0).toFixed(2);
 }
@@ -1269,11 +1556,15 @@ document.addEventListener('input', (e)=>{
 function submitScrap(){
   const karat = parseFloat(document.getElementById('sc-karat').value);
   const weight = parseFloat(document.getElementById('sc-weight').value)||0;
-  const price = parseFloat(document.getElementById('sc-price').value)||0;
+  let price = parseFloat(document.getElementById('sc-price').value)||0;
   const name = document.getElementById('sc-name').value.trim();
   const employee = document.getElementById('sc-employee').value.trim();
-  if(weight<=0 || price<=0){ toast('أدخل الوزن والسعر بشكل صحيح'); return; }
-  const total = weight*price;
+  const typedTotal = parseFloat(document.getElementById('sc-total').value)||0;
+  if(weight<=0){ toast('أدخل وزن الكسر'); return; }
+  if(price<=0 && typedTotal<=0){ toast('أدخل سعر الجرام أو الإجمالي'); return; }
+  // لو كتبت الإجمالي بإيدك بيبقى هو المرجع، وسعر الجرام بيتحسب منه
+  const total = typedTotal>0? typedTotal : weight*price;
+  price = total/weight;
   const price21 = (total/weight)*(BASE_KARAT/karat);
   mutate(()=>{
     state.treasury.cash -= total;
@@ -1299,8 +1590,8 @@ function buildBarcodeValue(karat, weight, serial){
 }
 
 const CATALOG_LISTS = {
-  items:{ key:'itemTypes', counter:'itemType', title:'الأصناف', singular:'صنف', placeholder:'مثال: غويشة' },
-  classifications:{ key:'classifications', counter:'classification', title:'التصنيفات', singular:'تصنيف', placeholder:'مثال: خواتم أو أساور' },
+  items:{ key:'itemTypes', counter:'itemType', title:'الأصناف', singular:'صنف', placeholder:'اكتب اسم الصنف' },
+  classifications:{ key:'classifications', counter:'classification', title:'التصنيفات', singular:'تصنيف', placeholder:'اكتب اسم التصنيف' },
 };
 
 function renderCatalog(){
@@ -1362,7 +1653,7 @@ function openEditCatalogModal(tabKey, id){
       <div class="modal">
         <h2>تعديل ${esc(cfg.singular)}</h2>
         <div class="field"><label>الاسم</label><input id="cat-edit-name" value="${esc(x.name)}"></div>
-        ${isClass? `<div class="field"><label>باركود التصنيف</label><input id="cat-edit-bc" value="${esc(x.barcode||'')}" placeholder="مثال: 01"></div>`:''}
+        ${isClass? `<div class="field"><label>باركود التصنيف</label><input id="cat-edit-bc" value="${esc(x.barcode||'')}" placeholder="رقمين مثل 01"></div>`:''}
         <div class="modal-actions">
           <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteCatalogEntry('${tabKey}','${id}')">حذف</button>
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -1411,7 +1702,7 @@ function renderPriceCategoriesTab(){
     <div class="card" style="margin-bottom:16px;">
       <label>فئة سعرية جديدة</label>
       <div class="row">
-        <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="مثال: EG-R/M" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="اسم أو رمز الفئة السعرية" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
         <div class="field"><label>أجر الجرام</label><input type="number" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
       </div>
       <button class="btn btn-gold" onclick="addPriceCategory()">+ إضافة</button>
@@ -4113,7 +4404,7 @@ function openLotModal(dir, editId){
           <div class="field"><label>وزن القطع (جم)</label><input type="number" step="0.001" id="lot-weight" value="${l? l.weight:''}" placeholder="0.000" oninput="recalcLot()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="number" step="0.01" id="lot-price" value="${l? l.pricePerGram21:''}" placeholder="0.00" oninput="recalcLot()"></div>
+          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="number" step="0.01" id="lot-price" value="${l? l.pricePerGram21 : (((dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT))||'')&&(dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT)).toFixed(2))}" placeholder="0.00" oninput="recalcLot()"></div>
           <div class="field"><label>الوزن المحوّل لعيار ${BASE_KARAT}</label><input id="lot-w21" readonly value="0.000" style="font-weight:800;color:var(--navy);"></div>
         </div>
         <div class="row">
@@ -5692,6 +5983,7 @@ function sqAdd(){
 
 /* ============================= لوحة التحكم (كولكشن فيو) ============================= */
 const HOME_SHORTCUTS = [
+  {view:'gold-prices', label:'أسعار الذهب', icon:'💰'},
   {view:'journal', label:'اليومية', icon:'🗓'},
   {view:'customer-sale-builder', label:'فاتورة مبيعات عميل', icon:'🧾'},
   {view:'sale-builder', label:'فاتورة مبيعات لتاجر', icon:'↗'},
@@ -5805,6 +6097,271 @@ function renderHomeTreasury(){
       ${renderWeightCoverCard('تأمين وزن عام', 'كل الفترات من بداية التشغيل لحد النهارده', '', '')}
     </div>
   `;
+}
+
+
+/* ============================= System Code — أسعار الذهب ============================= */
+function goldCfg(){
+  state.settings = state.settings || {};
+  if(!state.settings.gold) state.settings.gold = {buy21:0, sell21:0, overrides:{}, updatedAt:''};
+  if(!state.settings.gold.overrides) state.settings.gold.overrides = {};
+  return state.settings.gold;
+}
+/* سعر الجرام لأي عيار: لو فيه سعر يدوي مسجّل بيتاخد، غير كده بيتحسب من عيار 21 */
+function goldAutoPrice(base21, karat){ return (Number(base21)||0) * (Number(karat)||BASE_KARAT) / BASE_KARAT; }
+function goldBuyPrice(karat){
+  const g = goldCfg();
+  const ov = g.overrides[karat];
+  if(ov && ov.buy!=null && ov.buy!=='') return Number(ov.buy)||0;
+  return goldAutoPrice(g.buy21, karat);
+}
+function goldSellPrice(karat){
+  const g = goldCfg();
+  const ov = g.overrides[karat];
+  if(ov && ov.sell!=null && ov.sell!=='') return Number(ov.sell)||0;
+  return goldAutoPrice(g.sell21, karat);
+}
+function goldIsManual(karat, field){
+  const ov = goldCfg().overrides[karat];
+  return !!(ov && ov[field]!=null && ov[field]!=='');
+}
+
+function renderSystemCode(){
+  const items = [
+    {view:'gold-prices', icon:'💰', label:'أسعار الذهب', desc:'سعر بيع وشراء الجرام لعيار '+BASE_KARAT+' وباقي العيارات'},
+    {view:'backup', icon:'💾', label:'نسخة احتياطية', desc:'نزّل نسخة من كل البيانات أو ارجع لنسخة قديمة'},
+  ];
+  return `
+    <div class="pagehead">
+      <div><h1>System Code</h1><p>إعدادات النظام الأساسية</p></div>
+    </div>
+    <div class="sc-grid">
+      ${items.map(i=>`
+        <a class="sc-card" href="${viewHref(i.view)}" onclick="return navClick(event,'${i.view}')">
+          <span class="sc-ic">${i.icon}</span>
+          <span><span class="sc-lbl">${esc(i.label)}</span><br><span class="muted" style="font-size:11.5px;">${esc(i.desc)}</span></span>
+        </a>`).join('')}
+    </div>`;
+}
+
+function renderGoldPrices(){
+  const g = goldCfg();
+  const spread = (Number(g.sell21)||0) - (Number(g.buy21)||0);
+  const karats = [...state.karats].sort((a,b)=>b-a);
+  return `
+    <div class="pagehead">
+      <div><h1>أسعار الذهب</h1><p>حدد سعر بيع وسعر شراء الجرام لعيار ${BASE_KARAT} — باقي العيارات بتتحسب تلقائيًا، وسعر الشراء بينزل لوحده في شاشة شراء الدهب الكسر</p></div>
+      ${navBtn('scrap','⛃ شراء دهب كسر')}
+    </div>
+
+    <div class="card gp-main" data-enter-scope style="margin-bottom:18px;">
+      <div class="gp-head">سعر الجرام — عيار ${BASE_KARAT} (السعر الأساسي)</div>
+      <div class="gp-row">
+        <div class="gp-box buy">
+          <label>سعر الشراء (اللي بشتري بيه من العميل)</label>
+          <input type="number" step="0.01" id="gp-buy21" value="${Number(g.buy21||0).toFixed(2)}" oninput="gpPreview()">
+        </div>
+        <div class="gp-box sell">
+          <label>سعر البيع (اللي ببيع بيه للعميل)</label>
+          <input type="number" step="0.01" id="gp-sell21" value="${Number(g.sell21||0).toFixed(2)}" oninput="gpPreview()">
+        </div>
+        <div class="gp-box spread">
+          <label>الفرق (هامش الربح للجرام)</label>
+          <input readonly id="gp-spread" value="${spread.toFixed(2)}">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
+        <button class="btn btn-gold" data-enter-submit onclick="saveGold21()">حفظ الأسعار</button>
+        <span class="muted" style="font-size:12px;">
+          ${g.updatedAt? ('آخر تحديث: '+fmtDateRep(g.updatedAt)+' — '+new Date(g.updatedAt).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})) : 'لسه مفيش أسعار محفوظة'}
+        </span>
+      </div>
+    </div>
+
+    <div class="section-title">باقي العيارات<div class="line"></div></div>
+    <div class="hint" style="margin-bottom:10px;">
+      السعر بيتحسب تلقائيًا: <b>سعر عيار ${BASE_KARAT} × (العيار ÷ ${BASE_KARAT})</b>.
+      لو عايز عيار معيّن يكون بسعر مختلف اكتبه بإيدك وهيتقفل على القيمة دي لحد ما ترجّعه تلقائي.
+    </div>
+    <div class="tbl-wrap">
+      <table class="grid-table">
+        <thead><tr>
+          <th style="width:110px;">العيار</th>
+          <th class="right" style="width:190px;">سعر الشراء</th>
+          <th class="right" style="width:190px;">سعر البيع</th>
+          <th class="right" style="width:130px;">الفرق</th>
+          <th style="width:150px;">الحالة</th>
+          <th style="width:130px;"></th>
+        </tr></thead>
+        <tbody>
+        ${karats.map(k=>{
+          const bp = goldBuyPrice(k), sp = goldSellPrice(k);
+          const manual = goldIsManual(k,'buy') || goldIsManual(k,'sell');
+          return `<tr ${k===BASE_KARAT?'style="background:#f3f7fc;"':''}>
+            <td style="font-weight:800;">عيار ${k}${k===BASE_KARAT?' <span class="pill pill-gold">أساسي</span>':''}</td>
+            <td><input type="number" step="0.01" value="${bp.toFixed(2)}" style="text-align:left;color:var(--red);font-weight:700;"
+                 onchange="setGoldKaratPrice(${k},'buy',this.value)"></td>
+            <td><input type="number" step="0.01" value="${sp.toFixed(2)}" style="text-align:left;color:var(--green);font-weight:700;"
+                 onchange="setGoldKaratPrice(${k},'sell',this.value)"></td>
+            <td class="right num" style="font-weight:700;">${(sp-bp).toFixed(2)}</td>
+            <td><span class="pill ${manual?'pill-gold':'pill-muted'}">${manual?'سعر يدوي':'تلقائي من ع'+BASE_KARAT}</span></td>
+            <td>${manual? `<button class="btn btn-sm btn-ghost" onclick="clearGoldKaratPrice(${k})">رجّع تلقائي</button>` : '<span class="muted" style="font-size:11.5px;">—</span>'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+function gpPreview(){
+  const b = parseFloat(document.getElementById('gp-buy21').value)||0;
+  const s2 = parseFloat(document.getElementById('gp-sell21').value)||0;
+  const el = document.getElementById('gp-spread');
+  if(el) el.value = (s2-b).toFixed(2);
+}
+function saveGold21(){
+  const buy = parseFloat(document.getElementById('gp-buy21').value)||0;
+  const sell = parseFloat(document.getElementById('gp-sell21').value)||0;
+  if(buy<0 || sell<0){ toast('السعر مينفعش يكون بالسالب'); return; }
+  mutate(()=>{
+    const g = goldCfg();
+    g.buy21 = buy; g.sell21 = sell; g.updatedAt = new Date().toISOString();
+    // نسيب نسخة في goldPrices القديمة عشان أي حتة تانية بتقرا منها
+    state.settings.goldPrices = state.settings.goldPrices || {};
+    state.karats.forEach(k=>{ state.settings.goldPrices[k] = goldBuyPrice(k); });
+  }, 'تم حفظ أسعار الذهب');
+}
+function setGoldKaratPrice(karat, field, val){
+  mutate(()=>{
+    const g = goldCfg();
+    const auto = field==='buy'? goldAutoPrice(g.buy21, karat) : goldAutoPrice(g.sell21, karat);
+    const v = parseFloat(val)||0;
+    if(!g.overrides[karat]) g.overrides[karat] = {};
+    // لو الرقم هو نفس الحساب التلقائي مانسجلوش كسعر يدوي
+    if(Math.abs(v - auto) < 0.005) delete g.overrides[karat][field];
+    else g.overrides[karat][field] = v;
+    if(!Object.keys(g.overrides[karat]).length) delete g.overrides[karat];
+    state.settings.goldPrices = state.settings.goldPrices || {};
+    state.karats.forEach(k=>{ state.settings.goldPrices[k] = goldBuyPrice(k); });
+  }, 'تم حفظ سعر عيار '+karat);
+}
+function clearGoldKaratPrice(karat){
+  mutate(()=>{
+    const g = goldCfg();
+    delete g.overrides[karat];
+    state.settings.goldPrices = state.settings.goldPrices || {};
+    state.karats.forEach(k=>{ state.settings.goldPrices[k] = goldBuyPrice(k); });
+  }, 'رجع عيار '+karat+' للحساب التلقائي');
+}
+
+
+/* ============================= System Code — النسخ الاحتياطي ============================= */
+function stateSizeKB(){
+  try{ return (new Blob([JSON.stringify(state)]).size/1024).toFixed(1); }catch(e){ return '—'; }
+}
+function dataCounts(){
+  return [
+    ['التجار', state.merchants.length],
+    ['العملاء', state.customers.length],
+    ['القطع', state.pieces.length],
+    ['فواتير مشتريات', state.purchaseInvoices.length],
+    ['فواتير مبيعات تجار', state.salesInvoices.length],
+    ['فواتير مبيعات عملاء', state.customerSales.length],
+    ['مرتجعات', state.merchantReturns.length + state.customerReturns.length],
+    ['شراء كسر', state.scrapPurchases.length],
+    ['قطع ذهب', state.goldLots.length],
+    ['تصنيع', state.manufactures.length],
+    ['تحصيل وتسديد', state.collections.length + state.payments.length],
+  ];
+}
+function renderBackup(){
+  return `
+    <div class="pagehead">
+      <div><h1>النسخ الاحتياطي واسترجاع البيانات</h1><p>نزّل نسخة من كل بيانات المحل، أو ارجع لنسخة قديمة — مهم جدًا قبل أي تحديث أو رفع على استضافة</p></div>
+      ${navBtn('system-code','← رجوع لـ System Code')}
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:18px;">
+      <div class="card" style="border-top:3px solid var(--green);">
+        <div style="font-family:'Almarai';font-weight:800;font-size:15px;margin-bottom:6px;color:var(--green);">⬇ تنزيل نسخة احتياطية</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.8;margin-bottom:14px;">
+          بينزّل ملف JSON فيه <b>كل</b> بيانات المحل (تجار، عملاء، فواتير، قطع، أسعار، خزينة).
+          احفظه في مكان أمان — وده اللي هترجع منه لو حصل أي حاجة.
+        </div>
+        <button class="btn btn-gold" onclick="downloadBackup()">⬇ نزّل النسخة دلوقتي</button>
+      </div>
+
+      <div class="card" style="border-top:3px solid var(--red);">
+        <div style="font-family:'Almarai';font-weight:800;font-size:15px;margin-bottom:6px;color:var(--red);">⬆ استرجاع من ملف</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.8;margin-bottom:14px;">
+          اختار ملف نسخة احتياطية وهيستبدل <b>كل</b> البيانات الحالية بيه.
+          <b style="color:var(--red);">تحذير:</b> البيانات الحالية هتتمسح — نزّل نسخة منها الأول.
+        </div>
+        <input type="file" id="bk-file" accept=".json,application/json" style="margin-bottom:10px;">
+        <button class="btn btn-danger" onclick="restoreBackup()">⬆ استرجع البيانات</button>
+      </div>
+    </div>
+
+    <div class="section-title">حالة البيانات الحالية<div class="line"></div></div>
+    <div class="tbl-wrap" style="margin-bottom:18px;">
+      <table class="grid-table">
+        <tbody>
+          ${dataCounts().map(r=>`<tr><td>${esc(r[0])}</td><td class="right num" style="font-weight:700;">${r[1]}</td></tr>`).join('')}
+          <tr style="background:#f3f7fc;"><td style="font-weight:800;">حجم ملف البيانات</td><td class="right num" style="font-weight:800;">${stateSizeKB()} كيلوبايت</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="border-right:4px solid var(--gold-bright);">
+      <div style="font-family:'Almarai';font-weight:800;font-size:14.5px;margin-bottom:10px;">📌 مهم لو رافع البرنامج على Railway أو أي استضافة</div>
+      <div class="muted" style="font-size:12.8px;line-height:2;">
+        الاستضافات بتمسح ملفات السيرفر مع كل رفع جديد. عشان البيانات تفضل:
+        <br>١) في Railway افتح الـ Service → تبويب <b>Variables</b> وضيف متغير:
+        <span class="mono" style="background:var(--panel-2);padding:2px 8px;border-radius:5px;">DATA_DIR = /data</span>
+        <br>٢) من نفس الصفحة → <b>+ Volume</b> واعمل Volume وحط الـ Mount Path
+        <span class="mono" style="background:var(--panel-2);padding:2px 8px;border-radius:5px;">/data</span>
+        <br>٣) اعمل Redeploy — وبعد كده أي رفع جديد مش هيمس البيانات.
+        <br><b>ولحد ما تظبط ده، نزّل نسخة احتياطية من هنا قبل كل رفع، وارجعها بعده.</b>
+      </div>
+    </div>`;
+}
+function downloadBackup(){
+  try{
+    const a = document.createElement('a');
+    a.href = '/api/backup';
+    a.download = 'goldshop-backup-'+todayStr()+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('بيتم تنزيل النسخة الاحتياطية');
+  }catch(e){ toast('تعذر التنزيل'); }
+}
+function restoreBackup(){
+  const input = document.getElementById('bk-file');
+  const file = input && input.files && input.files[0];
+  if(!file){ toast('اختار ملف النسخة الاحتياطية الأول'); return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let parsed = null;
+    try{ parsed = JSON.parse(reader.result); }
+    catch(e){ toast('الملف ده مش ملف نسخة احتياطية صالح'); return; }
+    // بيقبل الملف الخام أو الشكل اللي بيرجع من /api/state وهو {"state":{...}}
+    if(parsed && parsed.state && typeof parsed.state==='object') parsed = parsed.state;
+    if(!parsed || typeof parsed!=='object' || !parsed.treasury || !parsed.counters){
+      toast('الملف ده مش بيانات دفتر الصائغ'); return;
+    }
+    const info = 'الملف فيه: '+((parsed.merchants||[]).length)+' تاجر، '+((parsed.customers||[]).length)+' عميل، '
+      + ((parsed.pieces||[]).length)+' قطعة، '+((parsed.purchaseInvoices||[]).length)+' فاتورة شراء.';
+    showConfirmModal('هيتم استبدال كل البيانات الحالية بالنسخة دي. '+info+' متأكد؟', ()=>{
+      state = Object.assign(defaultState(), parsed);
+      if(!state.karats || !state.karats.length) state.karats=[...DEFAULT_KARATS];
+      state.karats.forEach(k=>{ if(state.treasury.gold[k]===undefined) state.treasury.gold[k]=0; });
+      if(!state.scrapStock) state.scrapStock = emptyGoldMap();
+      state.counters = Object.assign({}, COUNTERS_DEF, state.counters||{});
+      persist();
+      closeModal();
+      toast('تم استرجاع البيانات بنجاح');
+      goto('home');
+    }, {confirmLabel:'استرجع واستبدل'});
+  };
+  reader.readAsText(file);
 }
 
 /* ============================= INIT ============================= */
