@@ -1703,25 +1703,32 @@ function renderPriceCategoriesTab(){
       <label>فئة سعرية جديدة</label>
       <div class="row">
         <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="اسم أو رمز الفئة السعرية" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
-        <div class="field"><label>أجر الجرام</label><input type="number" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="number" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="number" step="0.01" id="pc-new-sell" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
       </div>
       <button class="btn btn-gold" onclick="addPriceCategory()">+ إضافة</button>
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>الاسم / الرمز</th><th>أجر الجرام</th><th style="width:150px;"></th></tr></thead>
+        <thead><tr><th>الاسم / الرمز</th><th class="right">سعر التكلفة</th><th class="right">سعر البيع</th><th class="right">الفرق</th><th style="width:160px;"></th></tr></thead>
         <tbody>
-        ${list.length? list.map(x=>`
+        ${list.length? list.map(x=>{
+          const cost = Number(x.price)||0, sell = Number(x.sellPrice!=null? x.sellPrice : x.price)||0;
+          const diff = sell - cost;
+          return `
           <tr>
-            <td>${esc(x.name)}</td>
-            <td class="num mono">${fmtCash(x.price||0)}</td>
+            <td style="font-weight:700;">${esc(x.name)}</td>
+            <td class="right num">${fmtCash(cost)}</td>
+            <td class="right num" style="font-weight:700;color:var(--navy);">${fmtCash(sell)}</td>
+            <td class="right num" style="color:${diff>=0?'var(--green)':'var(--red)'};">${fmtCash(diff)}</td>
             <td>
               <div style="display:flex;gap:6px;">
-                <button class="btn btn-sm btn-ghost" onclick="openEditPriceCategoryModal('${x.id}')">تعديل الأجر</button>
+                <button class="btn btn-sm btn-ghost" onclick="openEditPriceCategoryModal('${x.id}')">تعديل الأسعار</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteCatalogEntry('priceCategories','${x.id}')">حذف</button>
               </div>
             </td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="3">لا توجد فئات سعرية بعد</td></tr>`}
+          </tr>`;
+        }).join('') : `<tr class="empty-row"><td colspan="5">لا توجد فئات سعرية بعد</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1730,10 +1737,12 @@ function renderPriceCategoriesTab(){
 function addPriceCategory(){
   const name = document.getElementById('pc-new-name').value.trim();
   const price = parseFloat(document.getElementById('pc-new-price').value)||0;
+  const sellEl = document.getElementById('pc-new-sell');
+  const sellPrice = sellEl? (parseFloat(sellEl.value)||0) : 0;
   if(!name){ toast('اكتب اسمًا أو رمزًا أولاً'); return; }
   refocusAfterRender('pc-new-name');
   mutate(()=>{
-    state.priceCategories.push({id:uid('priceCategories'), name, price});
+    state.priceCategories.push({id:uid('priceCategories'), name, price, sellPrice});
     state.counters.priceCategory++;
   }, 'تمت إضافة الفئة السعرية');
 }
@@ -1745,9 +1754,12 @@ function openEditPriceCategoryModal(id){
     <div class="modal-bg" onclick="if(event.target===this)closeModal()">
       <div class="modal">
         <h2>تعديل الفئة السعرية</h2>
-        <div class="hint">لو أجر الجرام للفئة دي زاد أو قلّ، عدّله هنا — وكل الأكواد المرتبطة بيها هتاخد الأجر الجديد تلقائيًا في أول فاتورة جاية</div>
+        <div class="hint">سعر التكلفة بيستخدم في فواتير الشراء من التجار، وسعر البيع بيستخدم في فواتير مبيعات العملاء — وكل الأكواد المرتبطة بالفئة هتاخد الأسعار الجديدة تلقائيًا في أول فاتورة جاية</div>
         <div class="field"><label>الاسم أو الرمز</label><input id="pc-edit-name" value="${esc(pc.name)}"></div>
-        <div class="field"><label>أجر الجرام</label><input type="number" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
+        <div class="row">
+          <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="number" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
+          <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="number" step="0.01" id="pc-edit-sell" value="${(pc.sellPrice!=null? pc.sellPrice : (pc.price||0)).toFixed(2)}"></div>
+        </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
           <button class="btn btn-gold" onclick="submitEditPriceCategory('${id}')">حفظ</button>
@@ -1758,10 +1770,12 @@ function openEditPriceCategoryModal(id){
 function submitEditPriceCategory(id){
   const name = document.getElementById('pc-edit-name').value.trim();
   const price = parseFloat(document.getElementById('pc-edit-price').value)||0;
+  const sellEl = document.getElementById('pc-edit-sell');
+  const sellPrice = sellEl? (parseFloat(sellEl.value)||0) : price;
   if(!name){ toast('اكتب اسمًا أو رمزًا'); return; }
   mutate(()=>{
     const pc = state.priceCategories.find(x=>x.id===id);
-    pc.name = name; pc.price = price;
+    pc.name = name; pc.price = price; pc.sellPrice = sellPrice;
   }, 'تم تحديث الفئة السعرية');
   closeModal();
 }
@@ -1782,7 +1796,7 @@ function renderProductsTab(){
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الفئة السعرية</th><th>أجر الجرام الحالي</th><th style="width:90px;"></th></tr></thead>
+        <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الفئة السعرية</th><th class="right">سعر التكلفة</th><th class="right">سعر البيع</th><th style="width:160px;"></th></tr></thead>
         <tbody>
         ${state.products.length? state.products.map(p=>{
           const it=state.itemTypes.find(x=>x.id===p.itemTypeId);
@@ -1793,14 +1807,56 @@ function renderProductsTab(){
             <td>${it?esc(it.name):'<span class="muted">—</span>'}</td>
             <td>${cl?esc(cl.name):'<span class="muted">—</span>'}</td>
             <td>${pc?esc(pc.name):'<span class="muted">—</span>'}</td>
-            <td class="num">${fmtCash(pc?pc.price||0:0)}</td>
-            <td><button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">حذف</button></td>
+            <td class="right num">${fmtCash(pc? (pc.price||0) : 0)}</td>
+            <td class="right num" style="font-weight:700;color:var(--navy);">${fmtCash(pc? (pc.sellPrice!=null? pc.sellPrice : pc.price||0) : 0)}</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm btn-ghost" onclick="openEditProductModal('${p.id}')">تعديل</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">حذف</button>
+              </div>
+            </td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="6">لا توجد منتجات مربوطة بعد</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="7">لا توجد منتجات مربوطة بعد</td></tr>`}
         </tbody>
       </table>
     </div>
   `;
+}
+function pcSellPrice(pc){ if(!pc) return 0; return Number(pc.sellPrice!=null? pc.sellPrice : pc.price)||0; }
+function pcCostPrice(pc){ if(!pc) return 0; return Number(pc.price)||0; }
+
+function openEditProductModal(id){
+  const p = state.products.find(x=>x.id===id);
+  if(!p) return;
+  const root=document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <h2>تعديل المنتج ${esc(p.code)}</h2>
+        <div class="hint">غيّر الصنف أو التصنيف أو الفئة السعرية المرتبطة بالكود ده</div>
+        <div class="row">
+          <div class="field"><label>الصنف</label><select id="pe-item">${state.itemTypes.map(x=>`<option value="${x.id}" ${p.itemTypeId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+          <div class="field"><label>التصنيف</label><select id="pe-class">${state.classifications.map(x=>`<option value="${x.id}" ${p.classificationId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+        </div>
+        <div class="field"><label>الفئة السعرية</label>
+          <select id="pe-price">${state.priceCategories.map(x=>`<option value="${x.id}" ${p.priceCategoryId===x.id?'selected':''}>${esc(x.name)} — تكلفة ${fmtCash(pcCostPrice(x))} · بيع ${fmtCash(pcSellPrice(x))}</option>`).join('')}</select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+          <button class="btn btn-gold" onclick="submitEditProduct('${id}')">حفظ</button>
+        </div>
+      </div>
+    </div>`;
+}
+function submitEditProduct(id){
+  const itemTypeId = document.getElementById('pe-item').value;
+  const classificationId = document.getElementById('pe-class').value;
+  const priceCategoryId = document.getElementById('pe-price').value;
+  mutate(()=>{
+    const p = state.products.find(x=>x.id===id);
+    if(p){ p.itemTypeId=itemTypeId; p.classificationId=classificationId; p.priceCategoryId=priceCategoryId; }
+  }, 'تم تعديل المنتج');
+  closeModal();
 }
 function addProduct(){
   const itemTypeId = document.getElementById('pr-item').value;
@@ -4736,7 +4792,9 @@ function renderCustomerSales(){
           <th style="width:55px;">رقم</th><th style="width:95px;">التاريخ</th><th style="width:190px;">العميل</th>
           <th style="width:120px;">رقم العميل</th><th>الأصناف</th>
           <th class="right" style="width:110px;">إجمالي الوزن</th>
-          <th class="right total-col" style="width:140px;">إجمالي الأجر</th>
+          <th class="right" style="width:115px;">قيمة الذهب</th>
+          <th class="right" style="width:110px;">الأجر</th>
+          <th class="right total-col" style="width:150px;">إجمالي الفاتورة</th>
           <th style="width:100px;">الدفع</th><th style="width:190px;"></th>
         </tr></thead>
         <tbody>
@@ -4744,7 +4802,7 @@ function renderCustomerSales(){
           const c = customerById(inv.customerId);
           const pills = (inv.items||[]).slice(0,3).map(i=>`<span class="pill pill-gold" style="margin:1px;">${esc(i.itemName||'')} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم</span>`).join('')
             + ((inv.items||[]).length>3? `<span class="pill pill-muted" style="margin:1px;">و ${inv.items.length-3} غيرها</span>`:'');
-          const due = inv.totalMaking||0;
+          const due = (inv.totalAll!=null? inv.totalAll : (inv.totalCash||inv.totalMaking||0));
           return `<tr>
             <td class="mono">#${inv.no}</td>
             <td class="muted num">${fmtDateRep(inv.date)}</td>
@@ -4752,7 +4810,10 @@ function renderCustomerSales(){
             <td class="muted num">${c && c.phone? esc(c.phone):'—'}</td>
             <td>${pills}</td>
             <td class="right num">${Number(inv.totalWeight||0).toFixed(3)} جم</td>
-            <td class="right total-col num" style="font-weight:700;color:var(--navy);">${fmtCash(due)}</td>
+            <td class="right num muted">${fmtCash(inv.totalGoldValue||0)}</td>
+            <td class="right num">${fmtCash(inv.totalMaking||0)}</td>
+            <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
+              <b class="num" style="color:var(--navy);">${Number(due).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(Number(due).toFixed(2))}</span></td>
             <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span></td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-ghost" onclick="showInvoiceQR('CS','${inv.id}')">▣ كيو آر</button>
@@ -4760,7 +4821,7 @@ function renderCustomerSales(){
               <button class="btn btn-sm btn-danger" onclick="deleteCustomerSale('${inv.id}')">حذف</button>
             </div></td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="9">لا توجد فواتير بعد</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="11">لا توجد فواتير بعد</td></tr>`}
         </tbody>
       </table>
     </div>`;
@@ -4777,33 +4838,58 @@ function addCustomerSalePieceByScan(){
   if(!piece){ toast('الباركود ده مش موجود في القطع'); if(input){input.value=''; input.focus();} return; }
   if(piece.sold){ toast('القطعة دي متباعة قبل كده'); if(input){input.value=''; input.focus();} return; }
   if(csb.items.some(x=>x.pieceId===piece.id)){ toast('القطعة دي مضافة في الفاتورة بالفعل'); if(input){input.value=''; input.focus();} return; }
-  const rate = pieceMakingRate(piece);
+  const rate = pieceSellMakingRate(piece);
+  const goldRate = goldSellPrice(piece.karat);
   const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
   csb.items.push({
     pieceId:piece.id, no:piece.no, code:pieceCode(piece), itemName:pieceLabel(piece),
     classificationId: piece.classificationId || (prod? prod.classificationId : null),
     itemTypeId: piece.itemTypeId || (prod? prod.itemTypeId : null),
-    karat:piece.karat, weight:piece.weight, rate, making:piece.weight*rate, barcodeValue:piece.barcodeValue
+    karat:piece.karat, weight:piece.weight,
+    goldRate, rate,
+    goldValue: piece.weight*goldRate,
+    making: piece.weight*rate,
+    lineTotal: piece.weight*(goldRate+rate),
+    barcodeValue:piece.barcodeValue
   });
   if(input) input.value='';
   refocusAfterRender('csb-scan');
   render();
 }
 function removeCustomerSaleLine(pieceId){ csb.items = csb.items.filter(x=>x.pieceId!==pieceId); refocusAfterRender('csb-scan'); render(); }
+function pieceSellMakingRate(piece){
+  const pc = piece.priceCategoryId? state.priceCategories.find(x=>x.id===piece.priceCategoryId) : null;
+  if(pc) return pcSellPrice(pc);
+  const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
+  if(prod){ const p2 = state.priceCategories.find(x=>x.id===prod.priceCategoryId); if(p2) return pcSellPrice(p2); }
+  return pieceMakingRate(piece);
+}
+function recalcCsbLine(it){
+  it.goldValue = it.weight * (Number(it.goldRate)||0);
+  it.making    = it.weight * (Number(it.rate)||0);
+  it.lineTotal = it.goldValue + it.making;
+}
 function setCustomerSaleRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
-  it.rate = parseFloat(val)||0; it.making = it.weight*it.rate; render();
+  it.rate = parseFloat(val)||0; recalcCsbLine(it); render();
+}
+function setCustomerSaleGoldRate(pieceId, val){
+  const it = csb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  it.goldRate = parseFloat(val)||0; recalcCsbLine(it); render();
 }
 function renderCustomerSaleBuilder(){
   if(!csb){ openCustomerSaleBuilder(); return '<div class="empty-state">...</div>'; }
   const c = customerById(csb.customerId);
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
+  const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
+  const totalAll = totalGoldValue + totalMaking;
   const available = state.pieces.filter(p=>!p.sold).length;
   return `
     <div class="pagehead">
-      <div><h1>فاتورة مبيعات لعميل</h1><p>امسح باركود القطعة (أو اكتب رقمها) واضغط Enter — الأجر بيتحسب من الفئة السعرية، والفاتورة بتطلع بكيو آر كود</p></div>
+      <div><h1>فاتورة مبيعات لعميل</h1><p>امسح باركود القطعة (أو اكتب رقمها) واضغط Enter — الإجمالي = (سعر جرام الذهب + أجر الجرام) × الوزن، والفاتورة بتطلع بكيو آر كود</p></div>
       ${navBtn('customer-sales','← رجوع لقائمة الفواتير')}
     </div>
 
@@ -4838,15 +4924,21 @@ function renderCustomerSaleBuilder(){
       </div>
     </div>
 
-    <div class="grid grid-3" style="margin-bottom:16px;">
+    <div class="grid grid-4" style="margin-bottom:16px;">
       <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${csb.items.length}</div></div>
       <div class="card stat"><div class="label"><span>إجمالي وزن الذهب</span></div><div class="value">${totalWeight.toFixed(3)} <small>جم</small></div></div>
-      <div class="card stat pos"><div class="label"><span>إجمالي أجر الفاتورة</span></div><div class="value">${fmtCash(totalMaking)}</div></div>
+      <div class="card stat"><div class="label"><span>قيمة الذهب</span></div><div class="value">${fmtCash(totalGoldValue)}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي الأجر</span></div><div class="value">${fmtCash(totalMaking)}</div></div>
+    </div>
+    <div class="card stat pos" style="margin-bottom:16px;border-color:var(--navy);">
+      <div class="label"><span>إجمالي الفاتورة (قيمة الذهب + الأجر)</span></div>
+      <div class="value" style="font-size:28px;display:flex;align-items:center;gap:12px;">${Number(totalAll).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${copyBtn(totalAll.toFixed(2))}</div>
     </div>
 
     <div class="tbl-wrap" style="margin-bottom:16px;">
       <table class="tl-table">
-        <thead><tr><th style="width:70px;">م</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>العيار</th><th class="right">الوزن</th><th style="width:130px;">أجر الجرام</th><th class="right">الأجر</th><th style="width:50px;"></th></tr></thead>
+        <thead><tr><th style="width:60px;">م</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>العيار</th><th class="right">الوزن</th>
+          <th style="width:120px;">سعر جرام الذهب</th><th style="width:120px;">أجر الجرام</th><th class="right total-col" style="width:135px;">الإجمالي</th><th style="width:50px;"></th></tr></thead>
         <tbody>
           ${csb.items.length? csb.items.map(it=>`
             <tr>
@@ -4857,21 +4949,25 @@ function renderCustomerSaleBuilder(){
               <td class="muted">${esc(classificationName(it.classificationId))}</td>
               <td class="muted">عيار ${it.karat}</td>
               <td class="right num">${it.weight.toFixed(3)} جم</td>
-              <td><input type="number" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
-              <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making)}</td>
+              <td><input type="number" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
+              <td><input type="number" step="0.01" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
+              <td class="right total-col num" style="font-weight:800;color:var(--navy);">${fmtCash(it.lineTotal||0)}
+                <div class="muted" style="font-size:10px;font-weight:400;">ذهب ${fmtCash(it.goldValue||0)} + أجر ${fmtCash(it.making||0)}</div></td>
               <td><span class="rm" style="display:inline-block;" onclick="removeCustomerSaleLine('${it.pieceId}')">✕</span></td>
-            </tr>`).join('') : `<tr class="empty-row"><td colspan="10">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="11">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
         </tbody>
         ${csb.items.length? `<tfoot><tr>
           <td colspan="6">الإجمالي</td>
-          <td class="right num">${totalWeight.toFixed(3)} جم</td><td></td>
-          <td class="right num">${fmtCash(totalMaking)}</td><td></td>
+          <td class="right num">${totalWeight.toFixed(3)} جم</td>
+          <td class="right num">${fmtCash(totalGoldValue)}</td>
+          <td class="right num">${fmtCash(totalMaking)}</td>
+          <td class="right total-col num">${fmtCash(totalAll)}</td><td></td>
         </tr></tfoot>`:''}
       </table>
     </div>
 
     <div class="row">
-      <div class="field"><label>المحصّل نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="csb-paid" value="${totalMaking.toFixed(2)}"></div>
+      <div class="field"><label>المحصّل نقداً الآن (من إجمالي الفاتورة)</label><input type="number" step="0.01" id="csb-paid" value="${totalAll.toFixed(2)}"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
         <button class="btn btn-gold" style="width:100%;" onclick="submitCustomerSale()">حفظ الفاتورة وطباعة الكيو آر</button>
       </div>
@@ -4885,8 +4981,10 @@ function submitCustomerSale(){
   if(!csb.customerId){ toast('اختر العميل أو ضيف عميل جديد'); return; }
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
+  const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
+  const totalAll = totalGoldValue + totalMaking;
   let paid = parseFloat(document.getElementById('csb-paid').value)||0;
-  paid = Math.max(0, Math.min(paid, totalMaking));
+  paid = Math.max(0, Math.min(paid, totalAll));
   const items = csb.items, customerId = csb.customerId;
   let savedId = null;
   mutate(()=>{
@@ -4898,13 +4996,14 @@ function submitCustomerSale(){
       if(pc){ pc.sold=true; pc.soldDate=todayStr(); pc.soldToCustomerId=customerId; pc.soldKind='customer'; }
     });
     state.treasury.cash += paid;
-    c.balanceCash += (totalMaking - paid);
+    c.balanceCash += (totalAll - paid);
     const invItems = items.map(it=>({pieceId:it.pieceId, pieceNo:it.no, karat:it.karat, weight:it.weight,
-      price:it.rate, makingPerGram:it.rate, making:it.making, total:it.making, productCode:it.code,
+      goldRate:it.goldRate, goldValue:it.goldValue,
+      price:it.rate, makingPerGram:it.rate, making:it.making, total:it.lineTotal, productCode:it.code,
       itemName:it.itemName, barcodeValue:it.barcodeValue, classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null}));
     savedId = uid('csale');
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
-      customerId, items:invItems, totalCash:totalMaking, totalMaking, totalWeight, amountPaidNow:paid});
+      customerId, items:invItems, totalCash:totalAll, totalMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
   }, 'تم حفظ فاتورة العميل');
   csb = null;
   goto('customer-sales');
@@ -4923,7 +5022,7 @@ function deleteCustomerSale(id){
         if(pc){ pc.sold=false; delete pc.soldDate; delete pc.soldToCustomerId; delete pc.soldKind; }
       });
       state.treasury.cash -= (inv.amountPaidNow||0);
-      if(c) c.balanceCash -= ((inv.totalMaking||0) - (inv.amountPaidNow||0));
+      if(c) c.balanceCash -= (((inv.totalAll!=null? inv.totalAll : (inv.totalCash||inv.totalMaking||0))) - (inv.amountPaidNow||0));
       state.customerSales = state.customerSales.filter(x=>x.id!==id);
     }, 'تم حذف الفاتورة وعكس قيدها');
     closeModal();
