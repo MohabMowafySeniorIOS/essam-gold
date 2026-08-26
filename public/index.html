@@ -5020,27 +5020,39 @@ function csbEffectiveTotal(){
   const auto = csb.items.reduce((s,i)=>s+(i.lineTotal||0),0);
   return (csb.manualTotal!=null && csb.manualTotal!=='')? Number(csb.manualTotal)||0 : auto;
 }
+function round2(n){ return Math.round((Number(n)||0)*100)/100; }
+/* الرقم اللي بتكتبه في التوزيع هو إجمالي الفاتورة بالظبط:
+   بنطرح منه قيمة الذهب، والباقي (الأجر) بيتوزع على القطع بنسبة الوزن،
+   وآخر سطر بياخد فرق التقريب عشان المجموع يطلع مساوي للرقم للقرش. */
 function csbDistribute(){
   const el = document.getElementById('csb-distribute');
-  const amount = parseFloat(el? el.value : '')||0;
+  const amount = round2(parseFloat(el? el.value : '')||0);
   if(!csb.items.length){ toast('مفيش قطع في الفاتورة'); return; }
-  if(amount<=0){ toast('اكتب مبلغ التوزيع الأول'); return; }
+  if(amount<=0){ toast('اكتب إجمالي الفاتورة الأول'); return; }
   const totalW = csb.items.reduce((s,i)=>s+i.weight,0);
   if(totalW<=0){ toast('وزن الفاتورة صفر'); return; }
-  const goldTotal = csb.items.reduce((s,i)=>s+(i.weight*(Number(i.goldRate)||0)),0);
-  const pool = amount - goldTotal;
-  let clamped = false;
-  csb.items.forEach(it=>{
-    const share = it.weight/totalW;
-    let rate = it.weight? (pool*share)/it.weight : 0;
-    const mn = csbMinRate(it);
-    if(rate < mn - 0.0001){ rate = mn; clamped = true; }
-    it.rate = rate; recalcCsbLine(it);
+  csb.items.forEach(it=>{ it.goldValue = it.weight*(Number(it.goldRate)||0); });
+  const goldTotal = round2(csb.items.reduce((s,i)=>s+i.goldValue,0));
+  let pool = round2(amount - goldTotal);
+  let belowGold = false, belowMin = false;
+  if(pool < 0){ pool = 0; belowGold = true; }
+  let acc = 0;
+  const last = csb.items.length - 1;
+  csb.items.forEach((it,idx)=>{
+    let making;
+    if(idx===last){ making = round2(pool - acc); }
+    else { making = round2(pool * (it.weight/totalW)); acc = round2(acc + making); }
+    it.making   = making;
+    it.rate     = it.weight? making/it.weight : 0;
+    it.lineTotal= round2(it.goldValue + making);
+    if(it.rate < csbMinRate(it) - 0.0001) belowMin = true;
   });
   csb.distribute = amount;
-  csb.manualTotal = csb.items.reduce((s,i)=>s+(i.lineTotal||0),0);
+  csb.manualTotal = amount;
   saveCsbDraft(); render();
-  toast(clamped? 'تم التوزيع — بس بعض القطع اتظبطت على الحد الأدنى للأجر' : 'تم توزيع المبلغ على القطع');
+  if(belowGold) toast('الرقم ده أقل من قيمة الذهب نفسها — الأجر اتصفّر، راجع سعر الجرام');
+  else if(belowMin) toast('اتوزع على '+csb.items.length+' قطعة — لاحظ إن أجر بعض القطع نزل تحت السعر التلقائي');
+  else toast('اتوزع على '+csb.items.length+' قطعة — إجمالي الفاتورة '+fmtCash(amount));
 }
 function setCustomerSaleGoldRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
@@ -5110,14 +5122,14 @@ function renderCustomerSaleBuilder(){
           <div class="muted" style="font-size:11px;margin-top:4px;">تعديل السعر ده بيحدّث سعر جرام الذهب لكل القطع حسب عيارها</div>
         </div>
         <div class="field" style="margin:0;">
-          <label>التوزيع</label>
+          <label>التوزيع (اكتب إجمالي الفاتورة)</label>
           <div style="display:flex;gap:8px;">
-            <input type="number" step="0.01" id="csb-distribute" placeholder="اكتب المبلغ ليتوزع على القطع"
+            <input type="number" step="0.01" id="csb-distribute" placeholder="اكتب إجمالي الفاتورة ليتوزع على القطع"
               value="${csb.distribute!=null? Number(csb.distribute).toFixed(2):''}"
               onkeydown="if(event.key==='Enter'){event.preventDefault();csbDistribute();}">
             <button class="btn" style="white-space:nowrap;" onclick="csbDistribute()">وزّع</button>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:4px;">المبلغ بيتوزع على القطع بنسبة الوزن (بعد خصم قيمة الذهب)</div>
+          <div class="muted" style="font-size:11px;margin-top:4px;">الرقم ده بيبقى إجمالي الفاتورة بالظبط — بيتشال منه قيمة الذهب والباقي أجر بيتوزع على القطع بنسبة الوزن</div>
         </div>
         <div class="field" style="margin:0;">
           <label>الإجمالي (يدوي)</label>
