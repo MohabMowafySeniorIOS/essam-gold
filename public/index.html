@@ -4895,7 +4895,7 @@ function addCustomerSalePieceByScan(){
     classificationId: piece.classificationId || (prod? prod.classificationId : null),
     itemTypeId: piece.itemTypeId || (prod? prod.itemTypeId : null),
     karat:piece.karat, weight:piece.weight,
-    goldRate, rate,
+    goldRate, rate, minRate: rate,
     goldValue: piece.weight*goldRate,
     making: piece.weight*rate,
     lineTotal: piece.weight*(goldRate+rate),
@@ -4919,10 +4919,61 @@ function recalcCsbLine(it){
   it.making    = it.weight * (Number(it.rate)||0);
   it.lineTotal = it.goldValue + it.making;
 }
+function csbMinRate(it){ return Number(it.minRate!=null? it.minRate : 0)||0; }
 function setCustomerSaleRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
-  it.rate = parseFloat(val)||0; recalcCsbLine(it); saveCsbDraft(); render();
+  let v = parseFloat(val)||0;
+  const mn = csbMinRate(it);
+  if(v < mn - 0.0001){ v = mn; toast('أجر الجرام مينفعش يقل عن السعر التلقائي ('+fmtCash(mn)+')'); }
+  it.rate = v; recalcCsbLine(it); saveCsbDraft(); render();
+}
+function setCustomerSaleLineTotal(pieceId, val){
+  const it = csb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  const target = parseFloat(val)||0;
+  const gold = it.weight * (Number(it.goldRate)||0);
+  let making = target - gold;
+  let rate = it.weight? making/it.weight : 0;
+  const mn = csbMinRate(it);
+  if(rate < mn - 0.0001){ rate = mn; toast('الإجمالي ده بيخلي أجر الجرام أقل من السعر التلقائي ('+fmtCash(mn)+')'); }
+  it.rate = rate; recalcCsbLine(it); csb.manualTotal = null; saveCsbDraft(); render();
+}
+function csbSetPrice21(val){
+  const v = parseFloat(val)||0;
+  csb.price21 = v;
+  csb.items.forEach(it=>{ it.goldRate = v * (Number(it.karat)||BASE_KARAT) / BASE_KARAT; recalcCsbLine(it); });
+  saveCsbDraft(); render();
+}
+function csbSetManualTotal(val){
+  const v = (val===''||val==null)? null : (parseFloat(val)||0);
+  csb.manualTotal = v; saveCsbDraft(); render();
+}
+function csbEffectiveTotal(){
+  const auto = csb.items.reduce((s,i)=>s+(i.lineTotal||0),0);
+  return (csb.manualTotal!=null && csb.manualTotal!=='')? Number(csb.manualTotal)||0 : auto;
+}
+function csbDistribute(){
+  const el = document.getElementById('csb-distribute');
+  const amount = parseFloat(el? el.value : '')||0;
+  if(!csb.items.length){ toast('مفيش قطع في الفاتورة'); return; }
+  if(amount<=0){ toast('اكتب مبلغ التوزيع الأول'); return; }
+  const totalW = csb.items.reduce((s,i)=>s+i.weight,0);
+  if(totalW<=0){ toast('وزن الفاتورة صفر'); return; }
+  const goldTotal = csb.items.reduce((s,i)=>s+(i.weight*(Number(i.goldRate)||0)),0);
+  const pool = amount - goldTotal;
+  let clamped = false;
+  csb.items.forEach(it=>{
+    const share = it.weight/totalW;
+    let rate = it.weight? (pool*share)/it.weight : 0;
+    const mn = csbMinRate(it);
+    if(rate < mn - 0.0001){ rate = mn; clamped = true; }
+    it.rate = rate; recalcCsbLine(it);
+  });
+  csb.distribute = amount;
+  csb.manualTotal = csb.items.reduce((s,i)=>s+(i.lineTotal||0),0);
+  saveCsbDraft(); render();
+  toast(clamped? 'تم التوزيع — بس بعض القطع اتظبطت على الحد الأدنى للأجر' : 'تم توزيع المبلغ على القطع');
 }
 function setCustomerSaleGoldRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
@@ -4935,7 +4986,9 @@ function renderCustomerSaleBuilder(){
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
   const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
-  const totalAll = totalGoldValue + totalMaking;
+  const autoTotal = totalGoldValue + totalMaking;
+  const totalAll = csbEffectiveTotal();
+  const price21 = (csb.price21!=null && csb.price21!=='')? Number(csb.price21) : Number(goldCfg().sell21||0);
   const available = state.pieces.filter(p=>!p.sold).length;
   return `
     <div class="pagehead">
@@ -4980,9 +5033,38 @@ function renderCustomerSaleBuilder(){
       <div class="card stat"><div class="label"><span>قيمة الذهب</span></div><div class="value">${fmtCash(totalGoldValue)}</div></div>
       <div class="card stat"><div class="label"><span>إجمالي الأجر</span></div><div class="value">${fmtCash(totalMaking)}</div></div>
     </div>
-    <div class="card stat pos" style="margin-bottom:16px;border-color:var(--navy);">
-      <div class="label"><span>إجمالي الفاتورة (قيمة الذهب + الأجر)</span></div>
-      <div class="value" style="font-size:28px;display:flex;align-items:center;gap:12px;">${Number(totalAll).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${copyBtn(totalAll.toFixed(2))}</div>
+    <div class="card" style="margin-bottom:16px;border-color:var(--navy);">
+      <div class="grid grid-3" style="align-items:flex-end;">
+        <div class="field" style="margin:0;">
+          <label>سعر البيع لعيار ${BASE_KARAT}</label>
+          <input type="number" step="0.01" id="csb-price21" value="${Number(price21||0).toFixed(2)}"
+            onchange="csbSetPrice21(this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();csbSetPrice21(this.value);}">
+          <div class="muted" style="font-size:11px;margin-top:4px;">تعديل السعر ده بيحدّث سعر جرام الذهب لكل القطع حسب عيارها</div>
+        </div>
+        <div class="field" style="margin:0;">
+          <label>التوزيع</label>
+          <div style="display:flex;gap:8px;">
+            <input type="number" step="0.01" id="csb-distribute" placeholder="اكتب المبلغ ليتوزع على القطع"
+              value="${csb.distribute!=null? Number(csb.distribute).toFixed(2):''}"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();csbDistribute();}">
+            <button class="btn" style="white-space:nowrap;" onclick="csbDistribute()">وزّع</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:4px;">المبلغ بيتوزع على القطع بنسبة الوزن (بعد خصم قيمة الذهب)</div>
+        </div>
+        <div class="field" style="margin:0;">
+          <label>الإجمالي (يدوي)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" step="0.01" id="csb-total" placeholder="اكتب إجمالي الفاتورة"
+              style="font-size:22px;font-weight:800;color:var(--green);text-align:center;"
+              value="${(csb.manualTotal!=null && csb.manualTotal!=='')? Number(csb.manualTotal).toFixed(2):''}"
+              onchange="csbSetManualTotal(this.value)"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();csbSetManualTotal(this.value);}">
+            ${copyBtn(Number(totalAll||0).toFixed(2))}
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:4px;">الإجمالي المحسوب: <b>${fmtCash(autoTotal)}</b>${(csb.manualTotal!=null && Math.abs(Number(csb.manualTotal)-autoTotal)>0.009)? ' · <span style="color:var(--red);">فرق '+fmtCash(Number(csb.manualTotal)-autoTotal)+'</span>':''}</div>
+        </div>
+      </div>
     </div>
 
     <div class="tbl-wrap" style="margin-bottom:16px;">
@@ -5000,8 +5082,11 @@ function renderCustomerSaleBuilder(){
               <td class="muted">عيار ${it.karat}</td>
               <td class="right num">${it.weight.toFixed(3)} جم</td>
               <td><input type="number" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
-              <td><input type="number" step="0.01" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
-              <td class="right total-col num" style="font-weight:800;color:var(--navy);">${fmtCash(it.lineTotal||0)}
+              <td><input type="number" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
+              <td class="total-col">
+                <input type="number" step="0.01" value="${Number(it.lineTotal||0).toFixed(2)}"
+                  style="padding:6px 8px;font-size:13px;font-weight:800;color:var(--navy);text-align:left;"
+                  onchange="setCustomerSaleLineTotal('${it.pieceId}',this.value)">
                 <div class="muted" style="font-size:10px;font-weight:400;">ذهب ${fmtCash(it.goldValue||0)} + أجر ${fmtCash(it.making||0)}</div></td>
               <td><span class="rm" style="display:inline-block;" onclick="removeCustomerSaleLine('${it.pieceId}')">✕</span></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="11">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
@@ -5011,7 +5096,7 @@ function renderCustomerSaleBuilder(){
           <td class="right num">${totalWeight.toFixed(3)} جم</td>
           <td class="right num">${fmtCash(totalGoldValue)}</td>
           <td class="right num">${fmtCash(totalMaking)}</td>
-          <td class="right total-col num">${fmtCash(totalAll)}</td><td></td>
+          <td class="right total-col num">${fmtCash(autoTotal)}</td><td></td>
         </tr></tfoot>`:''}
       </table>
     </div>
@@ -5032,8 +5117,10 @@ function submitCustomerSale(){
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
   const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
-  const totalAll = totalGoldValue + totalMaking;
-  let paid = parseFloat(document.getElementById('csb-paid').value)||0;
+  const totalAll = csbEffectiveTotal();
+  const effMaking = totalAll - totalGoldValue;
+  const paidEl = document.getElementById('csb-paid');
+  let paid = paidEl? (parseFloat(paidEl.value)||0) : totalAll;
   paid = Math.max(0, Math.min(paid, totalAll));
   const items = csb.items, customerId = csb.customerId;
   let savedId = null;
@@ -5053,7 +5140,7 @@ function submitCustomerSale(){
       itemName:it.itemName, barcodeValue:it.barcodeValue, classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null}));
     savedId = uid('csale');
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
-      customerId, items:invItems, totalCash:totalAll, totalMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
+      customerId, items:invItems, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
   }, 'تم حفظ فاتورة العميل');
   csb = null; saveCsbDraft();
   goto('customer-sales');
@@ -5175,6 +5262,7 @@ function printInvoiceWithQR(kind, id){
   const svg = qrSVG(invoiceQRPayload(kind, inv), {scale:4, quiet:3});
   const items = inv.items||[];
   const invGrandTotal = Number(inv.totalAll!=null? inv.totalAll : (inv.totalCash!=null? inv.totalCash : (inv.totalMaking||0)))||0;
+  const hideMaking = (kind==='CS' || kind==='CR');
   const area = document.getElementById('report-print-area');
   area.innerHTML = `
     <div style="font-family:'Tajawal',sans-serif;direction:rtl;color:#000;">
@@ -5195,7 +5283,7 @@ function printInvoiceWithQR(kind, id){
           <th style="border:1px solid #bbb;padding:6px;">العيار</th>
           <th style="border:1px solid #bbb;padding:6px;">الوزن</th>
           <th style="border:1px solid #bbb;padding:6px;">سعر جرام العيار</th>
-          <th style="border:1px solid #bbb;padding:6px;">أجر الجرام</th>
+          ${hideMaking?'':'<th style="border:1px solid #bbb;padding:6px;">أجر الجرام</th>'}
           <th style="border:1px solid #bbb;padding:6px;">الإجمالي</th>
         </tr></thead>
         <tbody>
@@ -5211,7 +5299,7 @@ function printInvoiceWithQR(kind, id){
             <td style="border:1px solid #ccc;padding:5px;text-align:center;">${it.karat}</td>
             <td style="border:1px solid #ccc;padding:5px;text-align:left;">${w.toFixed(3)}</td>
             <td style="border:1px solid #ccc;padding:5px;text-align:left;">${gr? fmtNum2(gr):'—'}</td>
-            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${fmtNum2(mr)}</td>
+            ${hideMaking?'':`<td style="border:1px solid #ccc;padding:5px;text-align:left;">${fmtNum2(mr)}</td>`}
             <td style="border:1px solid #ccc;padding:5px;text-align:left;font-weight:700;">${fmtNum2(lineTotal)}</td>
           </tr>`;}).join('')}
         </tbody>
@@ -5219,12 +5307,12 @@ function printInvoiceWithQR(kind, id){
           <td colspan="4" style="border:1px solid #bbb;padding:6px;">الإجمالي</td>
           <td style="border:1px solid #bbb;padding:6px;text-align:left;">${Number(inv.totalWeight||0).toFixed(3)}</td>
           <td style="border:1px solid #bbb;padding:6px;text-align:left;">${(inv.totalGoldValue||0)? fmtNum2(inv.totalGoldValue):'—'}</td>
-          <td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(inv.totalMaking||0)}</td>
+          ${hideMaking?'':`<td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(inv.totalMaking||0)}</td>`}
           <td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(invGrandTotal)}</td>
         </tr></tfoot>
       </table>
       ${(inv.totalGoldValue||0)? `<div style="margin-top:8px;font-size:12.5px;color:#444;">
-        قيمة الذهب: <b>${fmtNum2(inv.totalGoldValue)}</b> · إجمالي الأجر: <b>${fmtNum2(inv.totalMaking||0)}</b> · إجمالي الفاتورة: <b>${fmtNum2(invGrandTotal)}</b>
+        قيمة الذهب: <b>${fmtNum2(inv.totalGoldValue)}</b>${hideMaking?'':` · إجمالي الأجر: <b>${fmtNum2(inv.totalMaking||0)}</b>`} · إجمالي الفاتورة: <b>${fmtNum2(invGrandTotal)}</b>
       </div>`:''}
       <div style="margin-top:10px;font-size:13px;">
         ${(kind==='CR'||kind==='MR')?'المرتجع نقداً':'المحصّل نقداً'}: <b>${fmtNum2(inv.amountPaidNow||0)}</b> ·
@@ -5297,8 +5385,11 @@ function reopenInvoice(kind, id){
             goldValue: (Number(it.goldValue)||0) || (it.weight*(Number(it.goldRate)||0)),
             making: Number(it.making)||0,
             lineTotal: (it.weight*((Number(it.goldRate)||0)+(Number(it.makingPerGram!=null? it.makingPerGram : it.price)||0))),
+            minRate: (function(){ const pcx = state.pieces.find(x=>x.id===it.pieceId); return pcx? pieceSellMakingRate(pcx) : 0; })(),
             barcodeValue:it.barcodeValue
-          }))
+          })),
+          manualTotal: (Number(inv.totalAll)||0) || null,
+          price21: (function(){ const f=(inv.items||[])[0]; return f && f.goldRate? (Number(f.goldRate)*BASE_KARAT/(Number(f.karat)||BASE_KARAT)) : null; })()
         };
         state.drafts = state.drafts||{}; state.drafts.customerSale = JSON.parse(JSON.stringify(csb));
       }, 'اتفتحت الفاتورة #'+inv.no+' للتعديل');
