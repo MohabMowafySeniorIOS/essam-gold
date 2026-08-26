@@ -656,6 +656,8 @@ async function loadState(){
       }
       if(!state.settings.gold.overrides) state.settings.gold.overrides = {};
       if(!state.employees) state.employees=[];
+      state.drafts = state.drafts || {};
+      if(state.drafts.customerSale) csb = state.drafts.customerSale;
       ['customers','merchantReturns','customerSales','customerReturns','goldLots','manufactures'].forEach(k=>{ if(!state[k]) state[k]=[]; });
       if(!state.scrapStock) state.scrapStock = emptyGoldMap();
       state.karats.forEach(k=>{ if(state.scrapStock[k]===undefined) state.scrapStock[k]=0; });
@@ -794,7 +796,7 @@ function toast(msg){
   root.innerHTML=''; root.appendChild(el);
   setTimeout(()=>{ el.remove(); }, 2400);
 }
-function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; uiState.lotPresetPartyId=null; uiState.transferPresetFrom=null; }
 function showConfirmModal(message, onYes, opts){
   opts = opts || {};
   const root=document.getElementById('modal-root');
@@ -871,6 +873,10 @@ const NAV = [
     {id:'lots', label:'قطع ذهب (شراء / بيع)', icon:'◫'},
     {id:'lots-report', label:'تقرير القطعات', icon:'📊'},
     {id:'lots-profit', label:'فرق وأرباح القطعات', icon:'📈'},
+  ]},
+  {group:'التقارير', items:[
+    {id:'rep-sales', label:'تقرير الفواتير المباعة', icon:'📗'},
+    {id:'rep-returns', label:'تقرير فواتير المرتجعات', icon:'📕'},
   ]},
   {group:'الحسابات', items:[
     {id:'settlements', label:'تسوية الحسابات', icon:'⇄'},
@@ -1039,6 +1045,8 @@ function render(){
     'lots-profit': renderLotsProfit,
     settlements: renderSettlements,
     transfers: renderTransfers,
+    'rep-sales': renderSalesReport,
+    'rep-returns': renderReturnsReport,
     'system-code': renderSystemCode,
     'gold-prices': renderGoldPrices,
     backup: renderBackup,
@@ -2125,6 +2133,8 @@ function renderMerchantRow(m){
         <div style="display:flex;gap:6px;justify-content:flex-end;">
           <button class="btn btn-sm btn-ghost" onclick="openCPModal('collect','${m.id}')">↙ تحصيل</button>
           <button class="btn btn-sm btn-ghost" onclick="openCPModal('pay','${m.id}')">↗ تسديد</button>
+          <button class="btn btn-sm btn-ghost" onclick="openLotForParty('merchant','${m.id}')">◫ قطع</button>
+          <button class="btn btn-sm btn-ghost" onclick="openTransferForParty('merchant','${m.id}')">⇋ تحويل</button>
           <button class="btn btn-sm btn-ghost" onclick="openMerchantStatement('${m.id}')">▦ كشف حساب</button>
           <button class="btn btn-sm btn-gold" onclick="openMerchantModal('${m.id}')">تعديل</button>
         </div>
@@ -2693,7 +2703,7 @@ let pb = null; // purchase-builder page state
 
 function resetPurchaseBuilder(){
   pb = {
-    merchantId: state.merchants[0]? state.merchants[0].id : null,
+    merchantId: null,
     karat: merchantKarat(state.merchants[0]),
     search: '',
     classFilter: '',
@@ -2745,6 +2755,7 @@ function renderPurchaseBuilder(){
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>التاجر</label>
           <select onchange="pb.merchantId=this.value;pb.karat=merchantKarat(merchantById(this.value));render();">
+            <option value="">— اختر التاجر —</option>
             ${state.merchants.map(m=>`<option value="${m.id}" ${pb.merchantId===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}
           </select>
         </div>
@@ -3396,7 +3407,7 @@ function findPieceByScan(code){
 
 function openSaleBuilder(){
   if(!state.merchants.length){ toast('ضيف تاجر الأول — فتحتلك شاشة إضافة تاجر'); goToAddMerchant(); return; }
-  sb = { merchantId: state.merchants[0].id, items: [] };
+  sb = { merchantId: null, items: [] };
   goto('sale-builder');
 }
 function addSalePieceByScan(){
@@ -3451,6 +3462,7 @@ function renderSaleBuilder(){
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>التاجر المشتري</label>
           <select onchange="sb.merchantId=this.value;render();">
+            <option value="">— اختر التاجر —</option>
             ${state.merchants.map(x=>`<option value="${x.id}" ${sb.merchantId===x.id?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}
           </select>
         </div>
@@ -3808,7 +3820,7 @@ function openTransferModal(kind){
         <div class="hint">يُخصم من رصيد الأول ويُضاف لرصيد التاني بنفس القيم — لا يؤثر على الخزينة</div>
         <div class="row">
           <div class="field"><label>من (${lbl} المحوِّل)</label>
-            <select id="tr-from">${parties.map(m=>`<option value="${m.id}">${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
+            <select id="tr-from">${parties.map(m=>`<option value="${m.id}" ${uiState.transferPresetFrom===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
           </div>
           <div class="field"><label>إلى (${lbl} المستفيد)</label>
             <select id="tr-to">${parties.map(m=>`<option value="${m.id}">${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
@@ -4147,6 +4159,8 @@ function renderCustomerRow(c){
         <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
           <button class="btn btn-sm btn-ghost" onclick="openCCPModal('collect','${c.id}')">↙ تحصيل</button>
           <button class="btn btn-sm btn-ghost" onclick="openCCPModal('pay','${c.id}')">↗ تسديد</button>
+          <button class="btn btn-sm btn-ghost" onclick="openLotForParty('customer','${c.id}')">◫ قطع</button>
+          <button class="btn btn-sm btn-ghost" onclick="openTransferForParty('customer','${c.id}')">⇋ تحويل</button>
           <button class="btn btn-sm btn-ghost" onclick="openCustomerStatement('${c.id}')">▦ كشف حساب</button>
           <button class="btn btn-sm btn-gold" onclick="openCustomerModal('${c.id}')">تعديل</button>
         </div>
@@ -4431,6 +4445,15 @@ function renderLots(){
     </div>`;
 }
 
+function openLotForParty(kind, partyId){
+  uiState.lotPartyKind = kind;
+  uiState.lotPresetPartyId = partyId;
+  openLotModal('buy');
+}
+function openTransferForParty(kind, partyId){
+  uiState.transferPresetFrom = partyId;
+  openTransferModal(kind);
+}
 function openLotModal(dir, editId){
   const l = editId? state.goldLots.find(x=>x.id===editId) : null;
   const kind = l? l.partyKind : (uiState.lotPartyKind||'merchant');
@@ -4450,7 +4473,10 @@ function openLotModal(dir, editId){
             </select>
           </div>
           <div class="field"><label>${kind==='customer'?'العميل':'التاجر'}</label>
-            <select id="lot-party">${parties.map(p=>`<option value="${p.id}" ${l&&l.partyId===p.id?'selected':''}>${esc(p.name)} (${esc(p.code)})</option>`).join('')}</select>
+            <select id="lot-party">${parties.map(p=>{
+              const sel = l? (l.partyId===p.id) : (uiState.lotPresetPartyId===p.id);
+              return `<option value="${p.id}" ${sel?'selected':''}>${esc(p.name)} (${esc(p.code)})</option>`;
+            }).join('')}</select>
           </div>
         </div>
         <div class="row">
@@ -4775,9 +4801,20 @@ function renderCustomerSales(){
       <div><h1>فواتير مبيعات العملاء</h1><p>بيع بالباركود بأجر الفئة السعرية — كل فاتورة ليها كيو آر كود تقدر تعمل عليه اسكان وتجيب تفاصيلها</p></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         ${navBtn('invoice-scan','▣ اسكان كيو آر')}
-        <button class="btn btn-gold" onclick="openCustomerSaleBuilder()">+ فاتورة جديدة</button>
+        <button class="btn btn-gold" onclick="openCustomerSaleBuilder(true)">+ فاتورة جديدة</button>
       </div>
     </div>
+    ${(csb && (csb.items||[]).length)? `
+      <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:var(--navy);background:#f3f7fc;">
+        <div>
+          <div style="font-weight:800;color:var(--navy);margin-bottom:3px;">عندك فاتورة مفتوحة لسه متحفظتش</div>
+          <div class="muted" style="font-size:12.5px;">${csb.items.length} قطعة · ${csb.items.reduce((s,i)=>s+i.weight,0).toFixed(3)} جم${csb.customerId? ' · '+esc(customerName(csb.customerId)) : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-gold" onclick="resumeCustomerSaleBuilder()">↩ استكمال الفاتورة</button>
+          <button class="btn btn-danger" onclick="discardCsbDraft()">إلغاؤها</button>
+        </div>
+      </div>`:''}
     ${state.customers.length? '' : `
       <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:var(--gold-dim);">
         <div>
@@ -4827,9 +4864,21 @@ function renderCustomerSales(){
     </div>`;
 }
 
-function openCustomerSaleBuilder(){
-  csb = { customerId: state.customers[0]? state.customers[0].id : null, items: [] };
+function openCustomerSaleBuilder(force){
+  if(force || !csb) csb = { customerId: null, items: [] };
+  saveCsbDraft();
   goto('customer-sale-builder');
+}
+function resumeCustomerSaleBuilder(){ goto('customer-sale-builder'); }
+function saveCsbDraft(){
+  state.drafts = state.drafts || {};
+  state.drafts.customerSale = csb? JSON.parse(JSON.stringify(csb)) : null;
+  persist();
+}
+function discardCsbDraft(){
+  showConfirmModal('تلغي الفاتورة المفتوحة وتبدأ من الأول؟', ()=>{
+    csb = null; saveCsbDraft(); closeModal(); render();
+  }, {confirmLabel:'إلغاء الفاتورة'});
 }
 function addCustomerSalePieceByScan(){
   const input = document.getElementById('csb-scan');
@@ -4853,10 +4902,11 @@ function addCustomerSalePieceByScan(){
     barcodeValue:piece.barcodeValue
   });
   if(input) input.value='';
+  saveCsbDraft();
   refocusAfterRender('csb-scan');
   render();
 }
-function removeCustomerSaleLine(pieceId){ csb.items = csb.items.filter(x=>x.pieceId!==pieceId); refocusAfterRender('csb-scan'); render(); }
+function removeCustomerSaleLine(pieceId){ csb.items = csb.items.filter(x=>x.pieceId!==pieceId); saveCsbDraft(); refocusAfterRender('csb-scan'); render(); }
 function pieceSellMakingRate(piece){
   const pc = piece.priceCategoryId? state.priceCategories.find(x=>x.id===piece.priceCategoryId) : null;
   if(pc) return pcSellPrice(pc);
@@ -4872,12 +4922,12 @@ function recalcCsbLine(it){
 function setCustomerSaleRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
-  it.rate = parseFloat(val)||0; recalcCsbLine(it); render();
+  it.rate = parseFloat(val)||0; recalcCsbLine(it); saveCsbDraft(); render();
 }
 function setCustomerSaleGoldRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
-  it.goldRate = parseFloat(val)||0; recalcCsbLine(it); render();
+  it.goldRate = parseFloat(val)||0; recalcCsbLine(it); saveCsbDraft(); render();
 }
 function renderCustomerSaleBuilder(){
   if(!csb){ openCustomerSaleBuilder(); return '<div class="empty-state">...</div>'; }
@@ -4896,7 +4946,7 @@ function renderCustomerSaleBuilder(){
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>العميل</label>
-          <select onchange="csb.customerId=this.value;render();">
+          <select onchange="csb.customerId=this.value;saveCsbDraft();render();">
             <option value="">— اختر العميل —</option>
             ${state.customers.map(x=>`<option value="${x.id}" ${csb.customerId===x.id?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}
           </select>
@@ -4978,7 +5028,7 @@ function addCustomerInline(){
 }
 function submitCustomerSale(){
   if(!csb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
-  if(!csb.customerId){ toast('اختر العميل أو ضيف عميل جديد'); return; }
+  if(!csb.customerId){ toast('اختر العميل الأول من فوق'); return; }
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
   const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
@@ -5005,7 +5055,7 @@ function submitCustomerSale(){
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
       customerId, items:invItems, totalCash:totalAll, totalMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
   }, 'تم حفظ فاتورة العميل');
-  csb = null;
+  csb = null; saveCsbDraft();
   goto('customer-sales');
   if(savedId) setTimeout(()=>showInvoiceQR('CS', savedId), 120);
 }
@@ -5124,6 +5174,7 @@ function printInvoiceWithQR(kind, id){
   if(!inv) return;
   const svg = qrSVG(invoiceQRPayload(kind, inv), {scale:4, quiet:3});
   const items = inv.items||[];
+  const invGrandTotal = Number(inv.totalAll!=null? inv.totalAll : (inv.totalCash!=null? inv.totalCash : (inv.totalMaking||0)))||0;
   const area = document.getElementById('report-print-area');
   area.innerHTML = `
     <div style="font-family:'Tajawal',sans-serif;direction:rtl;color:#000;">
@@ -5139,34 +5190,45 @@ function printInvoiceWithQR(kind, id){
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="background:#eef2f7;">
           <th style="border:1px solid #bbb;padding:6px;">م</th>
-          <th style="border:1px solid #bbb;padding:6px;">الباركود</th>
-          <th style="border:1px solid #bbb;padding:6px;">الصنف</th>
+          <th style="border:1px solid #bbb;padding:6px;">باركود الصنف</th>
+          <th style="border:1px solid #bbb;padding:6px;">اسم الصنف</th>
           <th style="border:1px solid #bbb;padding:6px;">العيار</th>
           <th style="border:1px solid #bbb;padding:6px;">الوزن</th>
+          <th style="border:1px solid #bbb;padding:6px;">سعر جرام العيار</th>
           <th style="border:1px solid #bbb;padding:6px;">أجر الجرام</th>
-          <th style="border:1px solid #bbb;padding:6px;">الأجر</th>
+          <th style="border:1px solid #bbb;padding:6px;">الإجمالي</th>
         </tr></thead>
         <tbody>
-          ${items.map((it,i)=>`<tr>
+          ${items.map((it,i)=>{
+            const w  = Number(it.weight)||0;
+            const gr = Number(it.goldRate)||0;
+            const mr = Number(it.makingPerGram!=null? it.makingPerGram : it.price)||0;
+            const lineTotal = (it.goldRate!=null)? (w*(gr+mr)) : Number(it.total!=null? it.total : (it.making||0))||0;
+            return `<tr>
             <td style="border:1px solid #ccc;padding:5px;text-align:center;">${i+1}</td>
             <td style="border:1px solid #ccc;padding:5px;">${esc(it.barcodeValue||'—')}</td>
             <td style="border:1px solid #ccc;padding:5px;">${esc(it.itemName||'—')}</td>
             <td style="border:1px solid #ccc;padding:5px;text-align:center;">${it.karat}</td>
-            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${Number(it.weight).toFixed(3)}</td>
-            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${fmtNum2(it.makingPerGram||it.price||0)}</td>
-            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${fmtNum2(it.making||it.total||0)}</td>
-          </tr>`).join('')}
+            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${w.toFixed(3)}</td>
+            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${gr? fmtNum2(gr):'—'}</td>
+            <td style="border:1px solid #ccc;padding:5px;text-align:left;">${fmtNum2(mr)}</td>
+            <td style="border:1px solid #ccc;padding:5px;text-align:left;font-weight:700;">${fmtNum2(lineTotal)}</td>
+          </tr>`;}).join('')}
         </tbody>
         <tfoot><tr style="background:#eef2f7;font-weight:800;">
           <td colspan="4" style="border:1px solid #bbb;padding:6px;">الإجمالي</td>
           <td style="border:1px solid #bbb;padding:6px;text-align:left;">${Number(inv.totalWeight||0).toFixed(3)}</td>
-          <td style="border:1px solid #bbb;padding:6px;"></td>
-          <td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(inv.totalMaking||inv.totalCash||0)}</td>
+          <td style="border:1px solid #bbb;padding:6px;text-align:left;">${(inv.totalGoldValue||0)? fmtNum2(inv.totalGoldValue):'—'}</td>
+          <td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(inv.totalMaking||0)}</td>
+          <td style="border:1px solid #bbb;padding:6px;text-align:left;">${fmtNum2(invGrandTotal)}</td>
         </tr></tfoot>
       </table>
+      ${(inv.totalGoldValue||0)? `<div style="margin-top:8px;font-size:12.5px;color:#444;">
+        قيمة الذهب: <b>${fmtNum2(inv.totalGoldValue)}</b> · إجمالي الأجر: <b>${fmtNum2(inv.totalMaking||0)}</b> · إجمالي الفاتورة: <b>${fmtNum2(invGrandTotal)}</b>
+      </div>`:''}
       <div style="margin-top:10px;font-size:13px;">
         ${(kind==='CR'||kind==='MR')?'المرتجع نقداً':'المحصّل نقداً'}: <b>${fmtNum2(inv.amountPaidNow||0)}</b> ·
-        الباقي على الحساب: <b>${fmtNum2((inv.totalMaking||inv.totalCash||0)-(inv.amountPaidNow||0))}</b>
+        الباقي على الحساب: <b>${fmtNum2(invGrandTotal-(inv.amountPaidNow||0))}</b>
       </div>
     </div>`;
   document.body.classList.add('print-report');
@@ -5191,12 +5253,118 @@ function renderInvoiceScan(){
     ${res===undefined? '' : (res===null? `<div class="card" style="border-color:var(--red);color:var(--red);">مفيش فاتورة بالكود ده</div>` : `
       <div class="card">
         ${invoiceDetailHTML(res.kind, res.inv)}
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
           <button class="btn" onclick="showInvoiceQR('${res.kind}','${res.inv.id}')">▣ الكيو آر</button>
-          <button class="btn btn-gold" onclick="printInvoiceWithQR('${res.kind}','${res.inv.id}')">🖶 طباعة</button>
+          <button class="btn" onclick="printInvoiceWithQR('${res.kind}','${res.inv.id}')">🖶 طباعة</button>
+          ${(res.kind==='CS'||res.kind==='MS')? `
+            <button class="btn" onclick="returnFromInvoice('${res.kind}','${res.inv.id}')">⟲ مرتجع من الفاتورة</button>
+            <button class="btn btn-gold" onclick="reopenInvoice('${res.kind}','${res.inv.id}')">✎ فتح الفاتورة للتعديل</button>
+          `:''}
         </div>
       </div>`)}
   `;
+}
+/* فتح فاتورة متسجلة تاني للتعديل: بنعكس قيدها ونرجّع بنودها في شاشة الفاتورة */
+function reopenInvoice(kind, id){
+  if(kind==='CS'){
+    const inv = state.customerSales.find(x=>x.id===id);
+    if(!inv) return;
+    const sold = (inv.items||[]).filter(it=>{
+      const pc = state.pieces.find(x=>x.id===it.pieceId);
+      return pc && pc.sold && pc.soldToCustomerId!==inv.customerId;
+    }).length;
+    if(sold){ toast('مينفعش — فيه قطع من الفاتورة اتباعت في مكان تاني'); return; }
+    showConfirmModal('هتفتح فاتورة العميل #'+inv.no+' تاني للتعديل. قيدها هيتشال دلوقتي، ولما تحفظ هيتسجل من جديد. تمام؟', ()=>{
+      mutate(()=>{
+        const c = customerById(inv.customerId);
+        (inv.items||[]).forEach(it=>{
+          state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) + it.weight;
+          if(c) c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) - it.weight;
+          const pc = state.pieces.find(x=>x.id===it.pieceId);
+          if(pc){ pc.sold=false; delete pc.soldDate; delete pc.soldToCustomerId; delete pc.soldKind; }
+        });
+        state.treasury.cash -= (inv.amountPaidNow||0);
+        const grand = Number(inv.totalAll!=null? inv.totalAll : (inv.totalCash||inv.totalMaking||0))||0;
+        if(c) c.balanceCash -= (grand - (inv.amountPaidNow||0));
+        state.customerSales = state.customerSales.filter(x=>x.id!==id);
+        csb = {
+          customerId: inv.customerId,
+          items: (inv.items||[]).map(it=>({
+            pieceId:it.pieceId, no:it.pieceNo, code:it.productCode, itemName:it.itemName,
+            classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null,
+            karat:it.karat, weight:it.weight,
+            goldRate: Number(it.goldRate)||0, rate: Number(it.makingPerGram!=null? it.makingPerGram : it.price)||0,
+            goldValue: (Number(it.goldValue)||0) || (it.weight*(Number(it.goldRate)||0)),
+            making: Number(it.making)||0,
+            lineTotal: (it.weight*((Number(it.goldRate)||0)+(Number(it.makingPerGram!=null? it.makingPerGram : it.price)||0))),
+            barcodeValue:it.barcodeValue
+          }))
+        };
+        state.drafts = state.drafts||{}; state.drafts.customerSale = JSON.parse(JSON.stringify(csb));
+      }, 'اتفتحت الفاتورة #'+inv.no+' للتعديل');
+      closeModal();
+      uiState.qrResult = undefined;
+      goto('customer-sale-builder');
+    }, {confirmLabel:'افتحها للتعديل', danger:false});
+    return;
+  }
+  toast('التعديل متاح دلوقتي لفواتير مبيعات العملاء');
+}
+
+/* عمل مرتجع لقطعة من فاتورة معيّنة — بيفتح شاشة المرتجع محمّلة بقطع الفاتورة */
+function returnFromInvoice(kind, id){
+  const isCust = kind==='CS';
+  const inv = (isCust? state.customerSales : state.salesInvoices).find(x=>x.id===id);
+  if(!inv) return;
+  const rkind = isCust? 'customer' : 'merchant';
+  const cfg = returnCfg(rkind);
+  rb = { kind:rkind, partyId: isCust? inv.customerId : inv.merchantId, items: [], sourceInvoiceNo: inv.no };
+  uiState.returnPickInvoice = {kind, id};
+  uiState.qrResult = undefined;
+  goto(cfg.builderView);
+  toast('اختر القطع اللي هترجع من فاتورة #'+inv.no);
+}
+function rbAddFromSourceInvoice(pieceId){
+  const src = uiState.returnPickInvoice;
+  if(!src) return;
+  const inv = (src.kind==='CS'? state.customerSales : state.salesInvoices).find(x=>x.id===src.id);
+  if(!inv) return;
+  const it = (inv.items||[]).find(x=>x.pieceId===pieceId);
+  if(!it){ toast('القطعة مش في الفاتورة دي'); return; }
+  if(rb.items.some(x=>x.pieceId===pieceId)){ toast('مضافة بالفعل'); return; }
+  const piece = state.pieces.find(x=>x.id===pieceId);
+  if(!piece || !piece.sold){ toast('القطعة دي مش متباعة حاليًا'); return; }
+  rb.items.push({
+    pieceId, no:it.pieceNo, code:it.productCode, itemName:it.itemName,
+    classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null,
+    karat:it.karat, weight:it.weight,
+    rate: Number(it.makingPerGram!=null? it.makingPerGram : it.price)||0,
+    making: Number(it.making)||0,
+    barcodeValue:it.barcodeValue
+  });
+  render();
+}
+function renderReturnSourcePicker(){
+  const src = uiState.returnPickInvoice;
+  if(!src || !rb) return '';
+  const inv = (src.kind==='CS'? state.customerSales : state.salesInvoices).find(x=>x.id===src.id);
+  if(!inv) return '';
+  return `
+    <div class="card" style="margin-bottom:16px;border-color:var(--navy);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:800;color:var(--navy);">قطع فاتورة #${inv.no} — اضغط على القطعة عشان تضيفها للمرتجع</div>
+        <button class="btn btn-sm btn-ghost" onclick="uiState.returnPickInvoice=null;render();">إخفاء</button>
+      </div>
+      <div class="kv-inline">
+        ${(inv.items||[]).map(it=>{
+          const added = rb.items.some(x=>x.pieceId===it.pieceId);
+          const pc = state.pieces.find(x=>x.id===it.pieceId);
+          const gone = !pc || !pc.sold;
+          return `<button class="btn btn-sm ${added?'btn-gold':'btn-ghost'}" ${added||gone?'disabled':''}
+             onclick="rbAddFromSourceInvoice('${it.pieceId}')">${esc(it.itemName||'')} · ع${it.karat} · ${Number(it.weight).toFixed(3)}جم ${added?'✓':gone?'(مرجّعة)':''}</button>`;
+        }).join('')}
+      </div>
+    </div>`;
 }
 function doInvoiceScan(){
   const el = document.getElementById('qr-scan');
@@ -5206,6 +5374,175 @@ function doInvoiceScan(){
   render();
   const el2 = document.getElementById('qr-scan'); if(el2) el2.value='';
 }
+
+/* ============================= تقارير الفواتير ============================= */
+function invTotalOf(inv){
+  return Number(inv.totalAll!=null? inv.totalAll : (inv.totalCash!=null? inv.totalCash : (inv.totalMaking||0)))||0;
+}
+function repRange(){
+  return [uiState.repInvFrom||'', uiState.repInvTo||''];
+}
+function repInvFilter(list, partyFilter){
+  const [from,to] = repRange();
+  const q = (uiState.repInvSearch||'').trim().toLowerCase();
+  return list.filter(inv=>{
+    const d = String(inv.date).slice(0,10);
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    if(partyFilter && partyFilter!=='all' && inv.__party!==partyFilter) return false;
+    if(q){
+      const hay = ('#'+inv.no+' '+(inv.__partyName||'')+' '+(inv.items||[]).map(i=>i.itemName||'').join(' ')).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+function repCollect(kind){
+  // kind: 'sales' | 'returns'
+  const out = [];
+  if(kind==='sales'){
+    state.customerSales.forEach(i=> out.push(Object.assign({}, i, {__kind:'CS', __party:'customer', __partyName:customerName(i.customerId), __label:'مبيعات عميل'})));
+    state.salesInvoices.forEach(i=> out.push(Object.assign({}, i, {__kind:'MS', __party:'merchant', __partyName:merchantName(i.merchantId), __label:'مبيعات تاجر'})));
+  } else {
+    state.customerReturns.forEach(i=> out.push(Object.assign({}, i, {__kind:'CR', __party:'customer', __partyName:customerName(i.customerId), __label:'مرتجع عميل'})));
+    state.merchantReturns.forEach(i=> out.push(Object.assign({}, i, {__kind:'MR', __party:'merchant', __partyName:merchantName(i.merchantId), __label:'مرتجع تاجر'})));
+  }
+  return out.sort((a,b)=> new Date(b.date)-new Date(a.date) || b.no-a.no);
+}
+function renderInvoicesReport(kind){
+  const isSales = kind==='sales';
+  const pf = uiState.repInvParty||'all';
+  const all = repCollect(kind);
+  const rows = repInvFilter(all, pf);
+  const [from,to] = repRange();
+
+  const sum = f => rows.reduce((s,x)=>s+(Number(f(x))||0),0);
+  const totalW = sum(x=>x.totalWeight);
+  const totalGold = sum(x=>x.totalGoldValue||0);
+  const totalMaking = sum(x=>x.totalMaking||0);
+  const totalAll = sum(invTotalOf);
+  const totalPaid = sum(x=>x.amountPaidNow||0);
+  const totalDue = totalAll - totalPaid;
+  const pieces = rows.reduce((s,x)=>s+((x.items||[]).length),0);
+
+  // تجميع بالعميل/التاجر
+  const byParty = {};
+  rows.forEach(r=>{
+    const k = r.__partyName||'—';
+    if(!byParty[k]) byParty[k] = {n:0, w:0, total:0, paid:0};
+    byParty[k].n++; byParty[k].w += Number(r.totalWeight)||0;
+    byParty[k].total += invTotalOf(r); byParty[k].paid += Number(r.amountPaidNow)||0;
+  });
+  const partyRows = Object.entries(byParty).sort((a,b)=> b[1].total-a[1].total);
+
+  const parties = [['all','الكل'],['customer','عملاء'],['merchant','تجار']];
+  return `
+    <div class="pagehead">
+      <div><h1>${isSales? 'تقرير الفواتير المباعة' : 'تقرير فواتير المرتجعات'}</h1>
+        <p>${isSales? 'كل فواتير المبيعات (عملاء وتجار) بفلتر بالفترة والجهة' : 'كل فواتير المرتجعات (عملاء وتجار) بفلتر بالفترة والجهة'}</p></div>
+      <button class="btn" onclick="printReportEl('rep-inv-table','${isSales?'تقرير الفواتير المباعة':'تقرير فواتير المرتجعات'}')">🖶 طباعة</button>
+    </div>
+
+    <div class="filterbar">
+      <div class="fb-row">
+        <div class="f"><span>من تاريخ</span><input type="date" value="${esc(from)}" onchange="uiState.repInvFrom=this.value;render();"></div>
+        <div class="f"><span>إلى تاريخ</span><input type="date" value="${esc(to)}" onchange="uiState.repInvTo=this.value;render();"></div>
+        <div class="f"><span>الجهة</span>
+          <select onchange="uiState.repInvParty=this.value;render();">
+            ${parties.map(([k,l])=>`<option value="${k}" ${pf===k?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f grow"><span>بحث (رقم / اسم / صنف)</span>
+          <input id="rep-inv-q" value="${esc(uiState.repInvSearch||'')}" placeholder="ابحث..." oninput="uiState.repInvSearch=this.value;refocusAfterRender('rep-inv-q');render();"></div>
+        <div class="f auto"><span>&nbsp;</span><button class="btn btn-ghost btn-sm" onclick="uiState.repInvFrom='';uiState.repInvTo='';uiState.repInvParty='all';uiState.repInvSearch='';render();">↺ كل الفترات</button></div>
+      </div>
+    </div>
+
+    <div class="grid grid-4">
+      <div class="card stat"><div class="label"><span>عدد الفواتير</span></div><div class="value">${rows.length}</div></div>
+      <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${pieces}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي الوزن</span></div><div class="value">${totalW.toFixed(3)} <small>جم</small></div></div>
+      <div class="card stat ${isSales?'pos':'neg'}"><div class="label"><span>${isSales?'إجمالي المبيعات':'إجمالي المرتجعات'}</span></div>
+        <div class="value" style="display:flex;align-items:center;gap:10px;">${Number(totalAll).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${copyBtn(totalAll.toFixed(2))}</div></div>
+    </div>
+
+    <div class="kv-inline" style="margin-top:12px;">
+      <div class="kv-chip">قيمة الذهب: <b>${fmtCash(totalGold)}</b></div>
+      <div class="kv-chip">إجمالي الأجر: <b>${fmtCash(totalMaking)}</b></div>
+      <div class="kv-chip">${isSales?'المحصّل نقدًا':'المدفوع نقدًا'}: <b>${fmtCash(totalPaid)}</b></div>
+      <div class="kv-chip">الباقي على الحساب: <b>${fmtCash(totalDue)}</b></div>
+    </div>
+
+    <div class="section-title">تجميع حسب ${pf==='merchant'?'التاجر':pf==='customer'?'العميل':'الجهة'}<div class="line"></div></div>
+    <div class="tbl-wrap" style="margin-bottom:18px;">
+      <table class="grid-table">
+        <thead><tr><th>الاسم</th><th class="right">عدد الفواتير</th><th class="right">الوزن</th><th class="right">الإجمالي</th><th class="right">المحصّل</th><th class="right">الباقي</th></tr></thead>
+        <tbody>
+          ${partyRows.length? partyRows.map(([name,t])=>`
+            <tr>
+              <td style="font-weight:700;">${esc(name)}</td>
+              <td class="right num">${t.n}</td>
+              <td class="right num">${t.w.toFixed(3)} جم</td>
+              <td class="right num" style="font-weight:700;color:var(--navy);">${fmtCash(t.total)}</td>
+              <td class="right num">${fmtCash(t.paid)}</td>
+              <td class="right num" style="color:${(t.total-t.paid)>0?'var(--red)':'var(--muted-2)'};">${fmtCash(t.total-t.paid)}</td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="6">لا توجد فواتير في الفترة دي</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title">تفاصيل الفواتير<div class="line"></div></div>
+    <div class="tbl-wrap" id="rep-inv-table">
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:55px;">رقم</th><th style="width:95px;">التاريخ</th><th style="width:120px;">النوع</th>
+          <th style="width:180px;">الاسم</th><th>الأصناف</th>
+          <th class="right" style="width:100px;">الوزن</th>
+          <th class="right" style="width:115px;">قيمة الذهب</th>
+          <th class="right" style="width:105px;">الأجر</th>
+          <th class="right total-col" style="width:140px;">الإجمالي</th>
+          <th class="right" style="width:120px;">المحصّل</th>
+          <th style="width:150px;"></th>
+        </tr></thead>
+        <tbody>
+          ${rows.length? rows.map(inv=>{
+            const pills = (inv.items||[]).slice(0,3).map(i=>`<span class="pill pill-gold" style="margin:1px;">${esc(i.itemName||'')} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم</span>`).join('')
+              + ((inv.items||[]).length>3? `<span class="pill pill-muted" style="margin:1px;">و ${inv.items.length-3} غيرها</span>`:'');
+            const tot = invTotalOf(inv);
+            return `<tr>
+              <td class="mono">#${inv.no}</td>
+              <td class="muted num">${fmtDateRep(inv.date)}</td>
+              <td><span class="pill ${inv.__party==='customer'?'pill-gold':'pill-muted'}">${esc(inv.__label)}</span></td>
+              <td>${esc(inv.__partyName)}</td>
+              <td>${pills}</td>
+              <td class="right num">${Number(inv.totalWeight||0).toFixed(3)} جم</td>
+              <td class="right num muted">${(inv.totalGoldValue||0)? fmtCash(inv.totalGoldValue) : '—'}</td>
+              <td class="right num">${fmtCash(inv.totalMaking||0)}</td>
+              <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
+                <b class="num" style="color:var(--navy);">${Number(tot).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(tot.toFixed(2))}</span></td>
+              <td class="right num">${fmtCash(inv.amountPaidNow||0)}</td>
+              <td><div style="display:flex;gap:6px;justify-content:flex-end;">
+                <button class="btn btn-sm btn-ghost" onclick="openInvoiceView('${inv.__kind}','${inv.id}')">تفاصيل</button>
+                <button class="btn btn-sm btn-ghost" onclick="printInvoiceWithQR('${inv.__kind}','${inv.id}')">🖶</button>
+              </div></td>
+            </tr>`;
+          }).join('') : `<tr class="empty-row"><td colspan="11">لا توجد فواتير في الفترة دي</td></tr>`}
+        </tbody>
+        ${rows.length? `<tfoot><tr>
+          <td colspan="5">الإجمالي</td>
+          <td class="right num">${totalW.toFixed(3)} جم</td>
+          <td class="right num">${fmtCash(totalGold)}</td>
+          <td class="right num">${fmtCash(totalMaking)}</td>
+          <td class="right total-col num">${fmtCash(totalAll)}</td>
+          <td class="right num">${fmtCash(totalPaid)}</td>
+          <td></td>
+        </tr></tfoot>`:''}
+      </table>
+    </div>
+  `;
+}
+function renderSalesReport(){ return renderInvoicesReport('sales'); }
+function renderReturnsReport(){ return renderInvoicesReport('returns'); }
 
 /* ============================= فواتير المرتجعات (تجار + عملاء) ============================= */
 let rb = null; // return builder
@@ -5330,6 +5667,8 @@ function renderReturnBuilder(kind){
           <div class="value" style="font-size:17px;color:${p&&goldTo21(p.balanceGold)>=0?'var(--green)':'var(--red)'};">${Math.abs(p? goldTo21(p.balanceGold):0).toFixed(3)} جم</div></div>
       </div>
     </div>
+
+    ${renderReturnSourcePicker()}
 
     <div class="card ret-card" style="margin-bottom:16px;">
       <label>امسح باركود القطعة المرتجعة</label>
@@ -6049,10 +6388,11 @@ function sqScan(){
   document.getElementById('sq-karat').value = piece.karat;
   document.getElementById('sq-weight').value = piece.weight;
   const priceEl = document.getElementById('sq-price');
-  if(priceEl && !priceEl.value) priceEl.value = pieceMakingRate(piece).toFixed(2);
+  const typed = priceEl? (parseFloat(priceEl.value)||0) : 0;
+  if(priceEl && !typed) priceEl.value = pieceSellMakingRate(piece).toFixed(2);
   sqRecalc();
-  if(el) el.value = piece.barcodeValue || tagBarcodeValue(piece);
-  const w=document.getElementById('sq-weight'); if(w) w.focus();
+  if(el) el.value = '';
+  sqAdd();   // بيتسجل على طول من غير خطوة تانية
 }
 function sqAdd(){
   const party = sqCurrentParty();
@@ -6064,6 +6404,7 @@ function sqAdd(){
   if(weight<=0||price<=0){ toast('أدخل الوزن والسعر'); return; }
   const piece = uiState.sqPieceId? state.pieces.find(x=>x.id===uiState.sqPieceId) : null;
   const kind = uiState.sqKind;
+  refocusAfterRender('sq-scan');
   mutate(()=>{
     const rec = {id:uid('pd'), no:state.counters.pending++, date: uiState.sqDay||todayStr(),
       partyKind:kind, merchantId: kind==='merchant'? party.id : null, customerId: kind==='customer'? party.id : null,
