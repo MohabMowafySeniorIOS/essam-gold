@@ -81,6 +81,8 @@
   .navgroup-label .gchev{margin-inline-start:auto;font-size:10px;opacity:.8;transition:transform .18s;}
   .navgroup-label.closed .gchev{transform:rotate(-90deg);}
   .navgroup-label .gcount{background:rgba(255,255,255,.14);border-radius:20px;padding:0 6px;font-size:9.5px;}
+  .navgroup-label.hasactive{color:#fff;border-color:rgba(255,255,255,.45);background:rgba(255,255,255,.14);}
+  .navgroup-label.hasactive .gcount{background:#fff;color:#17406e;font-weight:800;}
   .navitem{
     display:flex;align-items:center;gap:10px;flex:none;
     padding:8px 12px;border-radius:6px;cursor:pointer;
@@ -913,8 +915,8 @@ function renderSidebar(){
     </div>`;
   NAV.forEach(g=>{
     const hasActive = g.items.some(it=> it.id===currentView || (it.children||[]).some(c=>c.id===currentView));
-    const gOpen = navGroupOpen(g.group, hasActive);
-    html += `<button type="button" class="navgroup-label ${gOpen?'':'closed'}" onclick="toggleNavSection('${esc(g.group)}')">
+    const gOpen = navGroupOpen(g.group);
+    html += `<button type="button" class="navgroup-label ${gOpen?'':'closed'} ${(hasActive&&!gOpen)?'hasactive':''}" onclick="toggleNavSection('${esc(g.group)}')">
       <span>${esc(g.group)}</span><span class="gcount">${g.items.length}</span><span class="gchev">▾</span></button>`;
     if(!gOpen) return;
     g.items.forEach(it=>{
@@ -950,19 +952,25 @@ function toggleNavGroup(id){
   renderSidebar();
 }
 /* أقسام السايدبار: العنوان بقى زرار بيفتح/بيقفل القسم */
-function navGroupOpen(group, hasActive){
+function navGroupOpen(group){
   uiState.navSections = uiState.navSections || {};
-  if(hasActive) return true;
-  return uiState.navSections[group] !== false;
+  return uiState.navSections[group] !== false;   // مفتوح افتراضيًا
+}
+function saveNavSections(){
+  try{ localStorage.setItem('navSections', JSON.stringify(uiState.navSections||{})); }catch(e){}
 }
 function toggleNavSection(group){
   uiState.navSections = uiState.navSections || {};
-  const hasActive = (NAV.find(g=>g.group===group)||{items:[]}).items
-    .some(it=> it.id===currentView || (it.children||[]).some(c=>c.id===currentView));
-  const cur = hasActive? true : (uiState.navSections[group] !== false);
-  uiState.navSections[group] = !cur;
-  try{ localStorage.setItem('navSections', JSON.stringify(uiState.navSections)); }catch(e){}
+  uiState.navSections[group] = !navGroupOpen(group);
+  saveNavSections();
   renderSidebar();
+}
+/* لما تفتح صفحة، القسم بتاعها يفتح لوحده — بس تفضل قادر تقفله بإيدك */
+function openNavSectionOf(view){
+  const g = NAV.find(g=> g.items.some(it=> it.id===view || (it.children||[]).some(c=>c.id===view)));
+  if(!g) return;
+  uiState.navSections = uiState.navSections || {};
+  if(uiState.navSections[g.group] === false){ uiState.navSections[g.group] = true; saveNavSections(); }
 }
 
 /* ====== قائمة الموبايل ====== */
@@ -1004,6 +1012,7 @@ function navBtn(view, label, cls){
 function goto(view){
   if(currentView!==view && window.innerWidth<=980) window.scrollTo({top:0});
   currentView=view;
+  openNavSectionOf(view);
   const h = viewHref(view);
   if(location.hash !== h){ suppressHashRender = true; location.hash = h; }
   render();
