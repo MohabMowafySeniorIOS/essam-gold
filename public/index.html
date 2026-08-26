@@ -72,7 +72,15 @@
   .brand .name{font-family:'Almarai',sans-serif;font-weight:800;font-size:16px;color:#fff;line-height:1.1;}
   .brand .sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;}
 
-  .navgroup-label{font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.5px;margin:12px 10px 5px;flex:none;}
+  .navgroup-label{display:flex;align-items:center;gap:8px;width:calc(100% - 12px);
+    font-size:10.5px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.5px;
+    margin:10px 6px 4px;padding:6px 8px;border-radius:6px;flex:none;cursor:pointer;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+    text-align:start;font-family:inherit;transition:.15s;}
+  .navgroup-label:hover{background:rgba(255,255,255,.12);color:#fff;}
+  .navgroup-label .gchev{margin-inline-start:auto;font-size:10px;opacity:.8;transition:transform .18s;}
+  .navgroup-label.closed .gchev{transform:rotate(-90deg);}
+  .navgroup-label .gcount{background:rgba(255,255,255,.14);border-radius:20px;padding:0 6px;font-size:9.5px;}
   .navitem{
     display:flex;align-items:center;gap:10px;flex:none;
     padding:8px 12px;border-radius:6px;cursor:pointer;
@@ -557,6 +565,10 @@
     body.print-barcodes #print-area{position:static;left:0;display:block !important;}
     body.print-report #report-print-area{position:static;left:0;display:block !important;}
   }
+  .items-sum{display:flex;align-items:center;gap:6px;max-width:195px;}
+  .items-sum-txt{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tl-table tr.row-editable{cursor:pointer;}
+  .tl-table tr.row-editable:hover{background:#eef3fa;}
 </style>
 </head>
 <body>
@@ -586,6 +598,7 @@ let uiState = { pendingTab:'pending', txtSearch:'', cpTab:'all', summaryKarat: 2
   repFrom:'', repTo:'', repKind:'', repColsOpen:false,
   stmtMerchantId:null, stmtFrom:'', stmtTo:'', stmtOpen:{},
   navOpen:{},
+  navSections:(function(){ try{ return JSON.parse(localStorage.getItem('navSections'))||{}; }catch(e){ return {}; } })(),
   repCols:{date:true, in:true, out:true, bal:true, kind:true, merchant:true, stmt:true, no:true} };
 
 function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
@@ -840,6 +853,10 @@ function goldMapTotalsRow(map){
 const NAV = [
   {group:'الرئيسية', items:[
     {id:'home', label:'لوحة التحكم', icon:'⬛'},
+    {id:'system-code', label:'System Code', icon:'⚙', children:[
+      {id:'gold-prices', label:'أسعار الذهب', icon:'💰'},
+      {id:'backup', label:'نسخة احتياطية', icon:'💾'},
+    ]},
     {id:'journal', label:'اليومية', icon:'🗓'},
     {id:'dashboard', label:'الخزينة', icon:'◆'},
     {id:'scrap', label:'شراء دهب كسر', icon:'⛃'},
@@ -881,12 +898,6 @@ const NAV = [
   {group:'الحسابات', items:[
     {id:'settlements', label:'تسوية الحسابات', icon:'⇄'},
   ]},
-  {group:'الإعدادات', items:[
-    {id:'system-code', label:'System Code', icon:'⚙', children:[
-      {id:'gold-prices', label:'أسعار الذهب', icon:'💰'},
-      {id:'backup', label:'نسخة احتياطية', icon:'💾'},
-    ]},
-  ]},
 ];
 
 function renderSidebar(){
@@ -901,7 +912,11 @@ function renderSidebar(){
       <button class="nav-close" onclick="closeNav()" aria-label="إغلاق">✕</button>
     </div>`;
   NAV.forEach(g=>{
-    html += `<div class="navgroup-label">${esc(g.group)}</div>`;
+    const hasActive = g.items.some(it=> it.id===currentView || (it.children||[]).some(c=>c.id===currentView));
+    const gOpen = navGroupOpen(g.group, hasActive);
+    html += `<button type="button" class="navgroup-label ${gOpen?'':'closed'}" onclick="toggleNavSection('${esc(g.group)}')">
+      <span>${esc(g.group)}</span><span class="gcount">${g.items.length}</span><span class="gchev">▾</span></button>`;
+    if(!gOpen) return;
     g.items.forEach(it=>{
       const badge = it.badgeKey==='pendingCount' && pendingCount>0 ? `<span class="badge">${pendingCount}</span>` : '';
       if(it.children && it.children.length){
@@ -932,6 +947,21 @@ function renderSidebar(){
 
 function toggleNavGroup(id){
   uiState.navOpen[id] = !uiState.navOpen[id];
+  renderSidebar();
+}
+/* أقسام السايدبار: العنوان بقى زرار بيفتح/بيقفل القسم */
+function navGroupOpen(group, hasActive){
+  uiState.navSections = uiState.navSections || {};
+  if(hasActive) return true;
+  return uiState.navSections[group] !== false;
+}
+function toggleNavSection(group){
+  uiState.navSections = uiState.navSections || {};
+  const hasActive = (NAV.find(g=>g.group===group)||{items:[]}).items
+    .some(it=> it.id===currentView || (it.children||[]).some(c=>c.id===currentView));
+  const cur = hasActive? true : (uiState.navSections[group] !== false);
+  uiState.navSections[group] = !cur;
+  try{ localStorage.setItem('navSections', JSON.stringify(uiState.navSections)); }catch(e){}
   renderSidebar();
 }
 
@@ -1451,7 +1481,7 @@ function renderScrap(){
     ${goldBuyPrice(BASE_KARAT)>0? '' : `<div class="card" style="margin-bottom:16px;border-color:var(--gold-dim);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
       <div>
         <div style="font-weight:700;color:var(--gold-bright);margin-bottom:3px;">لسه مفيش سعر ذهب محدد</div>
-        <div class="muted" style="font-size:12.5px;">حدد سعر الشراء والبيع لعيار ${BASE_KARAT} من <b>System Code → أسعار الذهب</b> عشان السعر ينزل لوحده في شاشة الشراء.</div>
+        <div class="muted" style="font-size:12.5px;">حدد سعر الجرام لعيار ${BASE_KARAT} من <b>System Code → أسعار الذهب</b> عشان السعر ينزل لوحده في شاشة الشراء.</div>
       </div>
       ${navBtn('gold-prices','⚙ حدد الأسعار دلوقتي','btn-gold')}
     </div>`}
@@ -2649,7 +2679,7 @@ function renderInvoiceList(kind){
           <th style="width:55px;">رقم</th>
           <th style="width:95px;">التاريخ</th>
           <th style="width:160px;">التاجر</th>
-          <th>الأصناف</th>
+          <th style="width:240px;">الأصناف</th>
           <th class="right" style="width:110px;">إجمالي الوزن</th>
           <th class="right total-col" style="width:150px;">إجمالي الأجر</th>
           <th style="width:110px;">طريقة الدفع</th>
@@ -2657,11 +2687,10 @@ function renderInvoiceList(kind){
         </tr></thead>
         <tbody>
         ${sorted.length? sorted.map(inv=>{
-          const pills = (inv.items||[]).map(i=>{
+          const shown = invItemsSummary((inv.items||[]).map(i=>{
             const itName = i.itemTypeId? state.itemTypes.find(x=>x.id===i.itemTypeId) : null;
-            return `<span class="pill pill-gold" style="margin:1px;">${itName?esc(itName.name)+' · ':''}ع${i.karat} · ${i.weight}جم</span>`;
-          });
-          const shown = pills.slice(0,4).join('') + (pills.length>4? `<span class="pill pill-muted" style="margin:1px;">و ${pills.length-4} غيرها</span>` : '');
+            return {itemName: itName? itName.name : (i.itemName||'صنف'), karat:i.karat, weight:i.weight};
+          }),'gold');
           const due = inv.totalCash||0;
           const payPill = due<=0? `<span class="pill pill-muted">بالوزن فقط</span>`
             : `<span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع كامل':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>`;
@@ -2670,7 +2699,7 @@ function renderInvoiceList(kind){
           const canChange = isPurchase && hrs>0 && sold===0;
           const why = hrs<=0? 'عدّى أكتر من ٢٤ ساعة' : (sold? 'فيه قطع اتباعت':'');
           return `
-          <tr>
+          <tr class="${canChange?'row-editable':''}" ${canChange? `ondblclick="editPurchaseInvoice('${inv.id}')" title="دوس مرتين عشان تفتح الفاتورة للتعديل"` : (isPurchase? `title="مقفولة · ${esc(why)}"` : '')}>
             <td class="mono">#${inv.no}</td>
             <td class="muted num">${fmtDateRep(inv.date)}</td>
             <td>${esc(merchantName(inv.merchantId))}</td>
@@ -2995,6 +3024,33 @@ function invoiceHoursLeft(inv){
   return (EDIT_WINDOW_MS - (Date.now() - invoiceCreatedMs(inv))) / 3600000;
 }
 function invoiceWithinWindow(inv){ return invoiceHoursLeft(inv) > 0; }
+function invItemsSummary(items, tone){
+  const arr = items||[];
+  if(!arr.length) return '<span class="muted">—</span>';
+  const full = arr.map((i,n)=>`${n+1}. ${i.itemName||''} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم`).join(' | ');
+  const cls = tone==='red'? 'pill-red' : 'pill-gold';
+  const first = arr[0];
+  return `<div class="items-sum" title="${esc(full)}">`
+    + `<span class="pill ${cls}" style="white-space:nowrap;">${arr.length} صنف</span>`
+    + `<span class="muted items-sum-txt">${esc(first.itemName||'')} ع${first.karat}${arr.length>1? ' + '+(arr.length-1)+' غيره' : ''}</span>`
+    + `</div>`;
+}
+function invoiceLockChip(inv){
+  if(invoiceWithinWindow(inv)){
+    const h = Math.max(0, invoiceHoursLeft(inv));
+    return `<span class="pill pill-green" title="متبقي ${h.toFixed(1)} ساعة على قفل التعديل">✎ ${h<1? Math.round(h*60)+' د' : h.toFixed(0)+' س'}</span>`;
+  }
+  return `<span class="pill pill-muted" title="عدّى 24 ساعة — التعديل بقى بالكيو آر كود بس">🔒 مقفولة</span>`;
+}
+function tryReopenInvoice(kind, id){
+  const inv = invoiceBucket(kind).find(x=>x.id===id);
+  if(!inv) return;
+  if(!invoiceWithinWindow(inv)){
+    toast('عدّى 24 ساعة على الفاتورة — مش هتتفتح للتعديل غير باسكان الكيو آر كود');
+    return;
+  }
+  reopenInvoice(kind, id);
+}
 function invoiceSoldPieces(inv){
   return state.pieces.filter(p=> p.invoiceId===inv.id && p.sold).length;
 }
@@ -4798,7 +4854,7 @@ function renderCustomerSales(){
   const list = [...state.customerSales].sort((a,b)=>new Date(b.date)-new Date(a.date) || b.no-a.no);
   return `
     <div class="pagehead">
-      <div><h1>فواتير مبيعات العملاء</h1><p>بيع بالباركود بأجر الفئة السعرية — كل فاتورة ليها كيو آر كود تقدر تعمل عليه اسكان وتجيب تفاصيلها</p></div>
+      <div><h1>فواتير مبيعات العملاء</h1><p>بيع بالباركود بأجر الفئة السعرية — دوس مرتين على الفاتورة عشان تفتحها للتعديل خلال ٢٤ ساعة، وبعد كده مش هتتفتح غير باسكان الكيو آر كود</p></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         ${navBtn('invoice-scan','▣ اسكان كيو آر')}
         <button class="btn btn-gold" onclick="openCustomerSaleBuilder(true)">+ فاتورة جديدة</button>
@@ -4826,21 +4882,21 @@ function renderCustomerSales(){
     <div class="tbl-wrap">
       <table class="tl-table">
         <thead><tr>
-          <th style="width:55px;">رقم</th><th style="width:95px;">التاريخ</th><th style="width:190px;">العميل</th>
-          <th style="width:120px;">رقم العميل</th><th>الأصناف</th>
-          <th class="right" style="width:110px;">إجمالي الوزن</th>
-          <th class="right" style="width:115px;">قيمة الذهب</th>
-          <th class="right" style="width:110px;">الأجر</th>
-          <th class="right total-col" style="width:150px;">إجمالي الفاتورة</th>
-          <th style="width:100px;">الدفع</th><th style="width:190px;"></th>
+          <th style="width:50px;">رقم</th><th style="width:88px;">التاريخ</th><th style="width:150px;">العميل</th>
+          <th style="width:100px;">رقم العميل</th><th style="width:200px;">الأصناف</th>
+          <th class="right" style="width:100px;">إجمالي الوزن</th>
+          <th class="right" style="width:105px;">قيمة الذهب</th>
+          <th class="right" style="width:100px;">الأجر</th>
+          <th class="right total-col" style="width:135px;">إجمالي الفاتورة</th>
+          <th style="width:100px;">الدفع</th><th style="width:110px;">التعديل</th><th style="width:200px;"></th>
         </tr></thead>
         <tbody>
         ${list.length? list.map(inv=>{
           const c = customerById(inv.customerId);
-          const pills = (inv.items||[]).slice(0,3).map(i=>`<span class="pill pill-gold" style="margin:1px;">${esc(i.itemName||'')} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم</span>`).join('')
-            + ((inv.items||[]).length>3? `<span class="pill pill-muted" style="margin:1px;">و ${inv.items.length-3} غيرها</span>`:'');
+          const pills = invItemsSummary(inv.items,'gold');
+          const editable = invoiceWithinWindow(inv);
           const due = (inv.totalAll!=null? inv.totalAll : (inv.totalCash||inv.totalMaking||0));
-          return `<tr>
+          return `<tr class="${editable?'row-editable':''}" ${editable? `ondblclick="tryReopenInvoice('CS','${inv.id}')" title="دوس مرتين عشان تفتح الفاتورة للتعديل"` : `title="عدّى 24 ساعة — التعديل بالكيو آر كود بس"`}>
             <td class="mono">#${inv.no}</td>
             <td class="muted num">${fmtDateRep(inv.date)}</td>
             <td>${esc(customerName(inv.customerId))}</td>
@@ -4852,13 +4908,14 @@ function renderCustomerSales(){
             <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
               <b class="num" style="color:var(--navy);">${Number(due).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(Number(due).toFixed(2))}</span></td>
             <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span></td>
+            <td>${editable? `<button class="btn btn-sm btn-ghost" style="white-space:nowrap;" title="متبقي ${Math.max(0,invoiceHoursLeft(inv)).toFixed(1)} ساعة" onclick="tryReopenInvoice('CS','${inv.id}')">✎ تعديل</button>` : invoiceLockChip(inv)}</td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-ghost" onclick="showInvoiceQR('CS','${inv.id}')">▣ كيو آر</button>
               <button class="btn btn-sm btn-ghost" onclick="openInvoiceView('CS','${inv.id}')">تفاصيل</button>
               <button class="btn btn-sm btn-danger" onclick="deleteCustomerSale('${inv.id}')">حذف</button>
             </div></td>
           </tr>`;
-        }).join('') : `<tr class="empty-row"><td colspan="11">لا توجد فواتير بعد</td></tr>`}
+        }).join('') : `<tr class="empty-row"><td colspan="12">لا توجد فواتير بعد</td></tr>`}
         </tbody>
       </table>
     </div>`;
@@ -4945,6 +5002,7 @@ function csbSetPrice21(val){
   csb.items.forEach(it=>{ it.goldRate = v * (Number(it.karat)||BASE_KARAT) / BASE_KARAT; recalcCsbLine(it); });
   saveCsbDraft(); render();
 }
+function csbSetNote(val){ if(!csb) return; csb.note = String(val||''); saveCsbDraft(); }
 function csbSetManualTotal(val){
   const v = (val===''||val==null)? null : (parseFloat(val)||0);
   csb.manualTotal = v; saveCsbDraft(); render();
@@ -5101,6 +5159,13 @@ function renderCustomerSaleBuilder(){
       </table>
     </div>
 
+    <div class="card" style="margin-bottom:16px;">
+      <label>البيان</label>
+      <textarea id="csb-note" rows="2" placeholder="اكتب أي تفاصيل خاصة بالفاتورة (مواصفات، اتفاق، ملاحظات التسليم...)"
+        style="width:100%;resize:vertical;" onchange="csbSetNote(this.value)" onblur="csbSetNote(this.value)">${esc(csb.note||'')}</textarea>
+      <div class="muted" style="font-size:11px;margin-top:4px;">البيان بيتحفظ مع الفاتورة وبيظهر في تفاصيلها وفي الطباعة</div>
+    </div>
+
     <div class="row">
       <div class="field"><label>المحصّل نقداً الآن (من إجمالي الفاتورة)</label><input type="number" step="0.01" id="csb-paid" value="${totalAll.toFixed(2)}"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
@@ -5119,6 +5184,9 @@ function submitCustomerSale(){
   const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
   const totalAll = csbEffectiveTotal();
   const effMaking = totalAll - totalGoldValue;
+  const noteEl = document.getElementById('csb-note');
+  if(noteEl) csb.note = noteEl.value||'';
+  const note = csb.note||'';
   const paidEl = document.getElementById('csb-paid');
   let paid = paidEl? (parseFloat(paidEl.value)||0) : totalAll;
   paid = Math.max(0, Math.min(paid, totalAll));
@@ -5140,7 +5208,7 @@ function submitCustomerSale(){
       itemName:it.itemName, barcodeValue:it.barcodeValue, classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null}));
     savedId = uid('csale');
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
-      customerId, items:invItems, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
+      customerId, items:invItems, note, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
   }, 'تم حفظ فاتورة العميل');
   csb = null; saveCsbDraft();
   goto('customer-sales');
@@ -5218,6 +5286,9 @@ function invoiceDetailHTML(kind, inv){
       <span class="kv-chip">إجمالي الأجر: <b>${fmtCash(inv.totalMaking||inv.totalCash||0)}</b></span>
       <span class="kv-chip">${(kind==='CR'||kind==='MR')?'المرتجع نقداً':'المحصّل نقداً'}: <b>${fmtCash(inv.amountPaidNow||0)}</b></span>
     </div>
+    ${inv.note? `<div class="card" style="margin-bottom:12px;padding:10px 12px;background:#f7f9fc;">
+      <div class="muted" style="font-size:11.5px;margin-bottom:3px;">البيان</div>
+      <div style="white-space:pre-wrap;font-size:13px;">${esc(inv.note)}</div></div>`:''}
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>م</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>العيار</th><th class="right">الوزن</th><th class="right">أجر الجرام</th><th class="right">الأجر</th></tr></thead>
@@ -5275,6 +5346,8 @@ function printInvoiceWithQR(kind, id){
         </div>
         <div style="text-align:center;">${svg}</div>
       </div>
+      ${inv.note? `<div style="border:1px solid #bbb;border-right:4px solid #17406e;padding:7px 10px;margin-bottom:10px;font-size:12.5px;">
+        <b>البيان:</b> <span style="white-space:pre-wrap;">${esc(inv.note)}</span></div>`:''}
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="background:#eef2f7;">
           <th style="border:1px solid #bbb;padding:6px;">م</th>
@@ -5388,6 +5461,7 @@ function reopenInvoice(kind, id){
             minRate: (function(){ const pcx = state.pieces.find(x=>x.id===it.pieceId); return pcx? pieceSellMakingRate(pcx) : 0; })(),
             barcodeValue:it.barcodeValue
           })),
+          note: inv.note||'',
           manualTotal: (Number(inv.totalAll)||0) || null,
           price21: (function(){ const f=(inv.items||[])[0]; return f && f.goldRate? (Number(f.goldRate)*BASE_KARAT/(Number(f.karat)||BASE_KARAT)) : null; })()
         };
@@ -5587,7 +5661,7 @@ function renderInvoicesReport(kind){
       <table class="tl-table">
         <thead><tr>
           <th style="width:55px;">رقم</th><th style="width:95px;">التاريخ</th><th style="width:120px;">النوع</th>
-          <th style="width:180px;">الاسم</th><th>الأصناف</th>
+          <th style="width:180px;">الاسم</th><th style="width:240px;">الأصناف</th>
           <th class="right" style="width:100px;">الوزن</th>
           <th class="right" style="width:115px;">قيمة الذهب</th>
           <th class="right" style="width:105px;">الأجر</th>
@@ -5597,8 +5671,7 @@ function renderInvoicesReport(kind){
         </tr></thead>
         <tbody>
           ${rows.length? rows.map(inv=>{
-            const pills = (inv.items||[]).slice(0,3).map(i=>`<span class="pill pill-gold" style="margin:1px;">${esc(i.itemName||'')} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم</span>`).join('')
-              + ((inv.items||[]).length>3? `<span class="pill pill-muted" style="margin:1px;">و ${inv.items.length-3} غيرها</span>`:'');
+            const pills = invItemsSummary(inv.items,'gold');
             const tot = invTotalOf(inv);
             return `<tr>
               <td class="mono">#${inv.no}</td>
@@ -5657,14 +5730,13 @@ function renderReturnsList(kind){
       <table class="tl-table">
         <thead><tr>
           <th style="width:55px;">رقم</th><th style="width:95px;">التاريخ</th><th style="width:200px;">${cfg.partyLabel}</th>
-          <th>الأصناف</th><th class="right" style="width:110px;">إجمالي الوزن</th>
+          <th style="width:240px;">الأصناف</th><th class="right" style="width:110px;">إجمالي الوزن</th>
           <th class="right total-col" style="width:140px;">إجمالي الأجر</th>
           <th style="width:120px;">المرتجع نقداً</th><th style="width:190px;"></th>
         </tr></thead>
         <tbody>
         ${list.length? list.map(inv=>{
-          const pills = (inv.items||[]).slice(0,3).map(i=>`<span class="pill pill-red" style="margin:1px;">${esc(i.itemName||'')} ع${i.karat} · ${Number(i.weight).toFixed(3)}جم</span>`).join('')
-            + ((inv.items||[]).length>3? `<span class="pill pill-muted" style="margin:1px;">و ${inv.items.length-3} غيرها</span>`:'');
+          const pills = invItemsSummary(inv.items,'red');
           return `<tr>
             <td class="mono">#${inv.no}</td>
             <td class="muted num">${fmtDateRep(inv.date)}</td>
@@ -6640,11 +6712,13 @@ function goldCfg(){
 }
 /* سعر الجرام لأي عيار: لو فيه سعر يدوي مسجّل بيتاخد، غير كده بيتحسب من عيار 21 */
 function goldAutoPrice(base21, karat){ return (Number(base21)||0) * (Number(karat)||BASE_KARAT) / BASE_KARAT; }
+/* سعر الشراء اتشال من الشاشة — بيرجع لسعر البيع لو مفيش سعر شراء متسجل */
 function goldBuyPrice(karat){
   const g = goldCfg();
   const ov = g.overrides[karat];
   if(ov && ov.buy!=null && ov.buy!=='') return Number(ov.buy)||0;
-  return goldAutoPrice(g.buy21, karat);
+  const base = Number(g.buy21)||Number(g.sell21)||0;
+  return goldAutoPrice(base, karat);
 }
 function goldSellPrice(karat){
   const g = goldCfg();
@@ -6659,7 +6733,7 @@ function goldIsManual(karat, field){
 
 function renderSystemCode(){
   const items = [
-    {view:'gold-prices', icon:'💰', label:'أسعار الذهب', desc:'سعر بيع وشراء الجرام لعيار '+BASE_KARAT+' وباقي العيارات'},
+    {view:'gold-prices', icon:'💰', label:'أسعار الذهب', desc:'سعر بيع الجرام لعيار '+BASE_KARAT+' وباقي العيارات'},
     {view:'backup', icon:'💾', label:'نسخة احتياطية', desc:'نزّل نسخة من كل البيانات أو ارجع لنسخة قديمة'},
   ];
   return `
@@ -6677,28 +6751,19 @@ function renderSystemCode(){
 
 function renderGoldPrices(){
   const g = goldCfg();
-  const spread = (Number(g.sell21)||0) - (Number(g.buy21)||0);
   const karats = [...state.karats].sort((a,b)=>b-a);
   return `
     <div class="pagehead">
-      <div><h1>أسعار الذهب</h1><p>حدد سعر بيع وسعر شراء الجرام لعيار ${BASE_KARAT} — باقي العيارات بتتحسب تلقائيًا، وسعر الشراء بينزل لوحده في شاشة شراء الدهب الكسر</p></div>
+      <div><h1>أسعار الذهب</h1><p>حدد سعر بيع الجرام لعيار ${BASE_KARAT} — باقي العيارات بتتحسب تلقائيًا، والسعر بينزل لوحده في الفواتير وفي شاشة شراء الدهب الكسر</p></div>
       ${navBtn('scrap','⛃ شراء دهب كسر')}
     </div>
 
     <div class="card gp-main" data-enter-scope style="margin-bottom:18px;">
       <div class="gp-head">سعر الجرام — عيار ${BASE_KARAT} (السعر الأساسي)</div>
       <div class="gp-row">
-        <div class="gp-box buy">
-          <label>سعر الشراء (اللي بشتري بيه من العميل)</label>
-          <input type="number" step="0.01" id="gp-buy21" value="${Number(g.buy21||0).toFixed(2)}" oninput="gpPreview()">
-        </div>
-        <div class="gp-box sell">
-          <label>سعر البيع (اللي ببيع بيه للعميل)</label>
-          <input type="number" step="0.01" id="gp-sell21" value="${Number(g.sell21||0).toFixed(2)}" oninput="gpPreview()">
-        </div>
-        <div class="gp-box spread">
-          <label>الفرق (هامش الربح للجرام)</label>
-          <input readonly id="gp-spread" value="${spread.toFixed(2)}">
+        <div class="gp-box sell" style="grid-column:1 / -1;">
+          <label>سعر البيع (سعر الجرام لعيار ${BASE_KARAT})</label>
+          <input type="number" step="0.01" id="gp-sell21" value="${Number(g.sell21||0).toFixed(2)}">
         </div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
@@ -6717,24 +6782,19 @@ function renderGoldPrices(){
     <div class="tbl-wrap">
       <table class="grid-table">
         <thead><tr>
-          <th style="width:110px;">العيار</th>
-          <th class="right" style="width:190px;">سعر الشراء</th>
-          <th class="right" style="width:190px;">سعر البيع</th>
-          <th class="right" style="width:130px;">الفرق</th>
-          <th style="width:150px;">الحالة</th>
+          <th style="width:130px;">العيار</th>
+          <th class="right" style="width:220px;">سعر البيع</th>
+          <th style="width:170px;">الحالة</th>
           <th style="width:130px;"></th>
         </tr></thead>
         <tbody>
         ${karats.map(k=>{
-          const bp = goldBuyPrice(k), sp = goldSellPrice(k);
-          const manual = goldIsManual(k,'buy') || goldIsManual(k,'sell');
+          const sp = goldSellPrice(k);
+          const manual = goldIsManual(k,'sell');
           return `<tr ${k===BASE_KARAT?'style="background:#f3f7fc;"':''}>
             <td style="font-weight:800;">عيار ${k}${k===BASE_KARAT?' <span class="pill pill-gold">أساسي</span>':''}</td>
-            <td><input type="number" step="0.01" value="${bp.toFixed(2)}" style="text-align:left;color:var(--red);font-weight:700;"
-                 onchange="setGoldKaratPrice(${k},'buy',this.value)"></td>
             <td><input type="number" step="0.01" value="${sp.toFixed(2)}" style="text-align:left;color:var(--green);font-weight:700;"
                  onchange="setGoldKaratPrice(${k},'sell',this.value)"></td>
-            <td class="right num" style="font-weight:700;">${(sp-bp).toFixed(2)}</td>
             <td><span class="pill ${manual?'pill-gold':'pill-muted'}">${manual?'سعر يدوي':'تلقائي من ع'+BASE_KARAT}</span></td>
             <td>${manual? `<button class="btn btn-sm btn-ghost" onclick="clearGoldKaratPrice(${k})">رجّع تلقائي</button>` : '<span class="muted" style="font-size:11.5px;">—</span>'}</td>
           </tr>`;
@@ -6743,19 +6803,12 @@ function renderGoldPrices(){
       </table>
     </div>`;
 }
-function gpPreview(){
-  const b = parseFloat(document.getElementById('gp-buy21').value)||0;
-  const s2 = parseFloat(document.getElementById('gp-sell21').value)||0;
-  const el = document.getElementById('gp-spread');
-  if(el) el.value = (s2-b).toFixed(2);
-}
 function saveGold21(){
-  const buy = parseFloat(document.getElementById('gp-buy21').value)||0;
   const sell = parseFloat(document.getElementById('gp-sell21').value)||0;
-  if(buy<0 || sell<0){ toast('السعر مينفعش يكون بالسالب'); return; }
+  if(sell<0){ toast('السعر مينفعش يكون بالسالب'); return; }
   mutate(()=>{
     const g = goldCfg();
-    g.buy21 = buy; g.sell21 = sell; g.updatedAt = new Date().toISOString();
+    g.sell21 = sell; g.buy21 = sell; g.updatedAt = new Date().toISOString();
     // نسيب نسخة في goldPrices القديمة عشان أي حتة تانية بتقرا منها
     state.settings.goldPrices = state.settings.goldPrices || {};
     state.karats.forEach(k=>{ state.settings.goldPrices[k] = goldBuyPrice(k); });
