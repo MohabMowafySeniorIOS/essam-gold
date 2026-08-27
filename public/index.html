@@ -590,6 +590,8 @@
   #print-area .ticket-qr svg{display:block;width:60%;height:auto;max-width:22mm;}
   #print-area .ticket-line{display:flex;gap:6px;font-weight:800;font-size:7.5pt;font-family:'Courier New',monospace;}
   #print-area .ticket-sn{font-family:'Courier New',monospace;font-size:6.5pt;letter-spacing:.5px;}
+  #print-area .test-ticket{width:100%;height:100%;page-break-after:auto;}
+  #print-area .test-ticket svg{display:block;width:100%;height:100%;}
   .items-sum{display:flex;align-items:center;gap:6px;max-width:195px;}
   .items-sum-txt{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tl-table tr.row-editable{cursor:pointer;}
@@ -2114,6 +2116,9 @@ function renderPieces(){
           <label style="margin-bottom:4px;">طول تيكت الحرارية (مم)</label>
           <input type="number" step="1" value="${thermalLabelSize().h}" onchange="setThermalLabelSize(null, this.value)">
         </div>
+        <div class="f" style="align-self:flex-end;">
+          <button class="btn btn-sm btn-ghost" onclick="printThermalTestTicket()" type="button">🖶 طباعة تيكت اختبار (مسطرة)</button>
+        </div>
       </div>
     </div>
 
@@ -2243,6 +2248,43 @@ function pieceThermalQRLabelHTML(p){
     <div class="ticket-line"><span>ع${p.karat}</span><span>${Number(p.weight).toFixed(3)}</span></div>
     <div class="ticket-sn">${esc(p.uid||tagBarcodeValue(p))}</div>
   </div>`;
+}
+/* ---------- تيكت اختبار (مسطرة ملم) لمعايرة مقاس الطباعة الحرارية ---------- */
+function thermalTestTicketSVG(wMM,hMM){
+  const w=Number(wMM), h=Number(hMM);
+  let ticks='';
+  for(let x=0;x<=w;x+=5){
+    const major = (Math.round(x)%10===0);
+    ticks += `<line x1="${x}" y1="0" x2="${x}" y2="${major?3:1.5}" stroke="#000" stroke-width="0.15"/>`;
+    if(major) ticks += `<text x="${x}" y="5.6" font-size="2" text-anchor="middle" font-family="monospace">${x}</text>`;
+  }
+  for(let y=0;y<=h;y+=5){
+    const major = (Math.round(y)%10===0);
+    ticks += `<line x1="0" y1="${y}" x2="${major?3:1.5}" y2="${y}" stroke="#000" stroke-width="0.15"/>`;
+    if(major) ticks += `<text x="4" y="${y+0.8}" font-size="2" text-anchor="start" font-family="monospace">${y}</text>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">
+    <rect x="0.3" y="0.3" width="${Math.max(0,w-0.6)}" height="${Math.max(0,h-0.6)}" fill="none" stroke="#000" stroke-width="0.4"/>
+    <line x1="0" y1="0" x2="${w}" y2="${h}" stroke="#000" stroke-width="0.15" stroke-dasharray="1,1"/>
+    <line x1="${w}" y1="0" x2="0" y2="${h}" stroke="#000" stroke-width="0.15" stroke-dasharray="1,1"/>
+    <line x1="${w/2}" y1="0" x2="${w/2}" y2="${h}" stroke="#000" stroke-width="0.2" stroke-dasharray="0.6,0.6"/>
+    <line x1="0" y1="${h/2}" x2="${w}" y2="${h/2}" stroke="#000" stroke-width="0.2" stroke-dasharray="0.6,0.6"/>
+    ${ticks}
+    <text x="${w/2}" y="${h/2-2}" font-size="2.6" text-anchor="middle" font-family="sans-serif" font-weight="bold">تيكت اختبار</text>
+    <text x="${w/2}" y="${h/2+2}" font-size="2.4" text-anchor="middle" font-family="monospace">${w} x ${h} mm</text>
+  </svg>`;
+}
+function printThermalTestTicket(){
+  const {w,h} = thermalLabelSize();
+  let area = document.getElementById('print-area');
+  if(!area){ area = document.createElement('div'); area.id='print-area'; document.body.appendChild(area); }
+  area.innerHTML = `<div class="test-ticket">${thermalTestTicketSVG(w,h)}</div>`;
+  setThermalPageStyle(w,h);
+  document.body.classList.add('print-barcodes');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ document.body.classList.remove('print-barcodes'); clearThermalPageStyle(); }, 500);
+  }, 80);
 }
 function setThermalPageStyle(wMM,hMM){
   const s = document.getElementById('thermal-page-style');
@@ -3112,7 +3154,7 @@ function renderPurchaseBuilder(){
         <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
-            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>أجر الجرام</th><th>الوزن</th><th class="right">الأجر</th><th>الباركود</th><th></th></tr></thead>
+            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>أجر الجرام</th><th>الوزن</th><th class="right">الأجر</th><th></th></tr></thead>
             <tbody id="pb-items-body">
               ${renderPBItemsRows()}
             </tbody>
@@ -3124,13 +3166,13 @@ function renderPurchaseBuilder(){
             <span class="kv-chip">إجمالي الوزن: <b>${totalWeight.toFixed(3)}</b> جم</span>
             <span class="kv-chip">إجمالي الأجر: <b>${fmtCash(totalMaking)}</b></span>
           </div>
-          <button class="btn btn-sm btn-ghost" onclick="printPBBarcodes()" type="button">🖶 طباعة تسلسل الباركود</button>
         </div>
 
         <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
           عند الحفظ: <b style="color:var(--gold-bright);">${totalWeight.toFixed(3)} جم</b> عيار ${pb.karat}
           هتتقيد للتاجر في رصيد الذهب (ليه علينا)، و<b style="color:var(--gold-bright);">${fmtCash(totalMaking)}</b>
           أجر (الوزن × أجر الجرام) هيتقيد في رصيده النقدي — يخصم منه اللي هتدفعه دلوقتي.
+          وهتفتح تلقائي شاشة كيو آر القطع عشان تطبعها على الطابعة الحرارية.
         </div>
         <div class="row">
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
@@ -3174,7 +3216,7 @@ function renderPurchaseBuilder(){
 }
 
 function renderPBItemsRows(){
-  if(!pb.items.length) return `<tr class="empty-row"><td colspan="8">لسه معنديش قطع مضافة</td></tr>`;
+  if(!pb.items.length) return `<tr class="empty-row"><td colspan="7">لسه معنديش قطع مضافة</td></tr>`;
   return pb.items.map((it,idx)=>`
     <tr>
       <td>${esc(it.classificationName)}</td>
@@ -3183,7 +3225,6 @@ function renderPBItemsRows(){
       <td class="num muted">${fmtCash(it.price)}</td>
       <td class="num">${it.weight.toFixed(3)} جم</td>
       <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making||0)}</td>
-      <td><button class="btn btn-sm btn-ghost" onclick="showPiecesBarcodeModal([pb.items.find(x=>x.tempId==='${it.tempId}')])">عرض</button></td>
       <td><span class="rm" style="display:inline-block;" onclick="removePBLine('${it.tempId}')">✕</span></td>
     </tr>
   `).join('');
@@ -3313,10 +3354,6 @@ function addPBLine(){
 function removePBLine(tempId){
   pb.items = pb.items.filter(x=>x.tempId!==tempId);
   render();
-}
-function printPBBarcodes(){
-  if(!pb.items.length){ toast('لا توجد قطع مضافة بعد'); return; }
-  printBarcodes(pb.items.map(i=>({no:i.serial, karat:i.karat, weight:i.weight, barcodeValue:i.barcodeValue})));
 }
 
 let pbEditId=null, pbEditNo=null, pbEditDate=null, pbEditCreatedAt=null;
@@ -6307,7 +6344,7 @@ function renderManufacture(){
             <td class="mono">${esc(m.barcodeValue||'—')}</td>
             <td class="muted">${esc(m.employee||'—')}</td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
-              ${pc? `<button class="btn btn-sm btn-ghost" onclick="showPiecesBarcodeModal([state.pieces.find(x=>x.id==='${pc.id}')])">باركود</button>`:''}
+              ${pc? `<button class="btn btn-sm btn-ghost" onclick="showPieceQRModal(['${pc.id}'])">▣ QR</button>`:''}
               <button class="btn btn-sm btn-danger" onclick="deleteManufacture('${m.id}')">حذف</button>
             </div></td>
           </tr>`;
@@ -6813,8 +6850,8 @@ function renderPieceLookup(){
             <div class="pill ${sold?'pill-red':'pill-green'}" style="font-size:15px;padding:8px 20px;margin-top:8px;">${sold? 'مباعة' : 'في الاستوك'}</div>
             ${sold? `<div class="muted" style="font-size:12px;margin-top:8px;">اتباعت لـ ${esc(buyer)}<br>${fmtDateRep(p.soldDate||'')}</div>`:''}
             <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-gold" onclick="printPieceQRs(['${p.id}'])">🖶 طباعة الكيو آر</button>
-              <button class="btn btn-sm btn-ghost" onclick="showPiecesBarcodeModal([state.pieces.find(x=>x.id==='${p.id}')])">الباركود</button>
+              <button class="btn btn-sm btn-gold" onclick="printPieceQRs(['${p.id}'])">🖶 طباعة الكيو آر (A4)</button>
+              <button class="btn btn-sm btn-ghost" onclick="printPiecesThermalQR(['${p.id}'])">🖶 طباعة حرارية (Zebra)</button>
             </div>
           </div>
         </div>
