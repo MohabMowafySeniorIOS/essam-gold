@@ -2153,7 +2153,6 @@ function renderPieces(){
             <td><span class="pill ${p.sold?'pill-red':'pill-green'}">${p.sold?'مباعة':'في الاستوك'}</span></td>
             <td><div style="display:flex;gap:5px;justify-content:flex-end;">
               <button class="btn btn-sm btn-gold" title="كيو آر القطعة" onclick="showPieceQRModal(['${p.id}'])">▣ QR</button>
-              <button class="btn btn-sm btn-ghost" onclick="showPiecesBarcodeModal([state.pieces.find(x=>x.id==='${p.id}')])">الباركود</button>
             </div></td>
           </tr>`;
         }).join('') : `<tr class="empty-row"><td colspan="11">مفيش قطع مطابقة — القطع بتتولد من فواتير الشراء أو من التصنيع</td></tr>`}
@@ -6272,7 +6271,7 @@ function renderManufactureBuilder(){
   return `
     <div class="pagehead">
       <div><h1>فاتورة تصنيع</h1>
-        <p>اختار الكود، اكتب وزن الكسر ووزن القطعة واضغط Enter — القطعة بتنزل في الفاتورة، ولما تحفظ كل القطع بتتصنّع مرة واحدة وكل واحدة بتاخد كود فريد وكيو آر خاص بيها</p></div>
+        <p>اختار الكود، اكتب وزن القطعة واضغط Enter — القطعة بتنزل في الفاتورة، ولما تحفظ كل القطع بتتصنّع مرة واحدة وكل واحدة بتاخد كود فريد وكيو آر خاص بيها</p></div>
       ${navBtn('manufacture','← رجوع لعمليات التصنيع')}
     </div>
 
@@ -6301,7 +6300,7 @@ function renderManufactureBuilder(){
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
             <thead><tr><th style="width:45px;">م</th><th>التصنيف</th><th>الكود</th><th>الصنف</th>
-              <th class="right" style="width:110px;">وزن الكسر</th><th class="right" style="width:110px;">وزن القطعة</th>
+              <th class="right" style="width:110px;">وزن القطعة</th>
               <th class="right" style="width:95px;">الفاقد</th><th style="width:45px;"></th></tr></thead>
             <tbody>
               ${mfb.items.length? mfb.items.map((it,idx)=>`
@@ -6310,13 +6309,11 @@ function renderManufactureBuilder(){
                   <td>${esc(it.classificationName||'—')}</td>
                   <td class="mono">${esc(it.code)}</td>
                   <td>${esc(it.itemName)}</td>
-                  <td><input type="number" step="0.001" value="${Number(it.scrapWeight).toFixed(3)}" style="padding:5px 7px;font-size:12.5px;"
-                       onchange="setMfbWeight(${idx},'scrapWeight',this.value)"></td>
                   <td><input type="number" step="0.001" value="${Number(it.pieceWeight).toFixed(3)}" style="padding:5px 7px;font-size:12.5px;"
                        onchange="setMfbWeight(${idx},'pieceWeight',this.value)"></td>
                   <td class="right num muted">${fmtW(Math.max(0,it.scrapWeight-it.pieceWeight))}</td>
                   <td><span class="rm" style="display:inline-block;" onclick="removeMfbItem(${idx})">✕</span></td>
-                </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لسه مفيش قطع في فاتورة التصنيع</td></tr>`}
+                </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لسه مفيش قطع في فاتورة التصنيع</td></tr>`}
             </tbody>
             ${mfb.items.length? `<tfoot><tr>
               <td colspan="4">الإجمالي</td>
@@ -6353,14 +6350,9 @@ function renderManufactureBuilder(){
           <div class="field"><label>الكود (الصنف / التصنيف / الفئة السعرية)</label>
             <select id="mfb-product">${state.products.map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(productLabel(x))}</option>`).join('')}</select>
           </div>
-          <div class="row">
-            <div class="field"><label>وزن الكسر المستخدم (جم)</label>
-              <input type="number" step="0.001" id="mfb-scrap" placeholder="0.000" oninput="mfbPreview()"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('mfb-weight').focus();}"></div>
-            <div class="field"><label>وزن القطعة الناتجة (جم)</label>
+          <div class="field"><label>وزن القطعة الناتجة (جم)</label>
               <input type="number" step="0.001" id="mfb-weight" placeholder="0.000" oninput="mfbPreview()"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();addMfbItem();}"></div>
-          </div>
           <div class="field"><label>الفاقد (بيتحسب تلقائي)</label><input id="mfb-waste" readonly value="0.000"></div>
           <button class="btn btn-gold" style="width:100%;" onclick="addMfbItem()">+ إضافة القطعة للفاتورة</button>
         </div>
@@ -6371,17 +6363,13 @@ function renderManufactureBuilder(){
     </div>`;
 }
 function mfbPreview(){
-  const sc=parseFloat((document.getElementById('mfb-scrap')||{}).value)||0;
-  const w=parseFloat((document.getElementById('mfb-weight')||{}).value)||0;
-  const el=document.getElementById('mfb-waste'); if(el) el.value=Math.max(0,sc-w).toFixed(3);
+  const el=document.getElementById('mfb-waste'); if(el) el.value='0.000';
 }
 function addMfbItem(){
   const pid = document.getElementById('mfb-product').value;
-  const scrapWeight = parseFloat(document.getElementById('mfb-scrap').value)||0;
   const pieceWeight = parseFloat(document.getElementById('mfb-weight').value)||0;
-  if(scrapWeight<=0){ toast('اكتب وزن الكسر المستخدم'); return; }
+  const scrapWeight = pieceWeight;
   if(pieceWeight<=0){ toast('اكتب وزن القطعة الناتجة'); return; }
-  if(pieceWeight>scrapWeight){ toast('وزن القطعة مينفعش يكون أكبر من وزن الكسر'); return; }
   const prod = state.products.find(x=>x.id===pid);
   if(!prod){ toast('اختار الكود الأول'); return; }
   const it = state.itemTypes.find(x=>x.id===prod.itemTypeId);
@@ -6390,9 +6378,9 @@ function addMfbItem(){
     itemTypeId: prod.itemTypeId, priceCategoryId: prod.priceCategoryId,
     scrapWeight, pieceWeight });
   saveMfbDraft();
-  refocusAfterRender('mfb-scrap');
+  refocusAfterRender('mfb-weight');
   render();
-  ['mfb-scrap','mfb-weight'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const e=document.getElementById('mfb-weight'); if(e) e.value='';
   const wv=document.getElementById('mfb-waste'); if(wv) wv.value='0.000';
 }
 function setMfbWeight(idx, field, val){
@@ -6400,8 +6388,8 @@ function setMfbWeight(idx, field, val){
   if(!it) return;
   const v = parseFloat(val)||0;
   if(v<=0){ toast('الوزن لازم يكون أكبر من صفر'); render(); return; }
-  it[field] = v;
-  if(it.pieceWeight > it.scrapWeight){ it.pieceWeight = it.scrapWeight; toast('وزن القطعة اتظبط على وزن الكسر'); }
+  it.pieceWeight = v;
+  it.scrapWeight = v;
   saveMfbDraft(); render();
 }
 function removeMfbItem(idx){ mfb.items.splice(idx,1); saveMfbDraft(); render(); }
