@@ -579,11 +579,23 @@
   .qr-shop{font-family:'Almarai',sans-serif;font-weight:800;font-size:10px;}
   .qr-uid{font-family:'Courier New',monospace;font-weight:700;font-size:11px;letter-spacing:.4px;margin:1px 0 2px;}
   .qr-line{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* ============ تيكت الطابعة الحرارية (Zebra) ============ */
+  #print-area .ticket{
+    width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:1mm;text-align:center;
+    font-family:'Tajawal',sans-serif;direction:rtl;padding:1mm;page-break-after:always;break-after:page;
+  }
+  #print-area .ticket:last-child{page-break-after:auto;break-after:auto;}
+  #print-area .ticket-shop{font-family:'Almarai',sans-serif;font-weight:800;font-size:7.5pt;line-height:1.1;}
+  #print-area .ticket-qr svg{display:block;width:60%;height:auto;max-width:22mm;}
+  #print-area .ticket-line{display:flex;gap:6px;font-weight:800;font-size:7.5pt;font-family:'Courier New',monospace;}
+  #print-area .ticket-sn{font-family:'Courier New',monospace;font-size:6.5pt;letter-spacing:.5px;}
   .items-sum{display:flex;align-items:center;gap:6px;max-width:195px;}
   .items-sum-txt{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tl-table tr.row-editable{cursor:pointer;}
   .tl-table tr.row-editable:hover{background:#eef3fa;}
 </style>
+<style id="thermal-page-style"></style>
 </head>
 <body>
 <div id="mobile-bar">
@@ -2094,6 +2106,14 @@ function renderPieces(){
           <label style="margin-bottom:4px;">اسم المحل على الملصق</label>
           <input value="${esc(shopName())}" placeholder="اسم المحل" onchange="setShopName(this.value)">
         </div>
+        <div class="f" style="min-width:110px;">
+          <label style="margin-bottom:4px;">عرض تيكت الحرارية (مم)</label>
+          <input type="number" step="1" value="${thermalLabelSize().w}" onchange="setThermalLabelSize(this.value, null)">
+        </div>
+        <div class="f" style="min-width:110px;">
+          <label style="margin-bottom:4px;">طول تيكت الحرارية (مم)</label>
+          <input type="number" step="1" value="${thermalLabelSize().h}" onchange="setThermalLabelSize(null, this.value)">
+        </div>
       </div>
     </div>
 
@@ -2170,6 +2190,17 @@ function shopName(){ return (state.settings && state.settings.shopName) || 'دف
 function setShopName(v){
   mutate(()=>{ state.settings = state.settings||{}; state.settings.shopName = String(v||'').trim(); }, 'تم حفظ اسم المحل');
 }
+function thermalLabelSize(){
+  const s = state.settings||{};
+  return { w: Number(s.thermalLabelW)||40, h: Number(s.thermalLabelH)||30 };
+}
+function setThermalLabelSize(w, h){
+  mutate(()=>{
+    state.settings = state.settings||{};
+    if(w!==null && w!==undefined){ const n=parseFloat(w); if(n>0) state.settings.thermalLabelW = n; }
+    if(h!==null && h!==undefined){ const n=parseFloat(h); if(n>0) state.settings.thermalLabelH = n; }
+  }, 'تم حفظ مقاس تيكت الطابعة الحرارية');
+}
 function tagBarcodeValue(p){ return String(p.no).padStart(5,'0'); }
 
 /* ملصق الدهب: طرفين بنفس البيانات وبينهم شريط باسم المحل يلف حوالين القطعة */
@@ -2203,6 +2234,38 @@ function pieceQRInfo(p){
     date: p.date||'',
     sold: !!p.sold
   };
+}
+function pieceThermalQRLabelHTML(p){
+  const svg = qrSVG(pieceQRPayload(p), {scale:3, quiet:1}) || '';
+  return `<div class="ticket">
+    <div class="ticket-shop">${esc(shopName())}</div>
+    <div class="ticket-qr">${svg}</div>
+    <div class="ticket-line"><span>ع${p.karat}</span><span>${Number(p.weight).toFixed(3)}</span></div>
+    <div class="ticket-sn">${esc(p.uid||tagBarcodeValue(p))}</div>
+  </div>`;
+}
+function setThermalPageStyle(wMM,hMM){
+  const s = document.getElementById('thermal-page-style');
+  if(s) s.textContent = `@page{ size:${wMM}mm ${hMM}mm; margin:0; }
+    #print-area .ticket{ width:${wMM}mm; height:${hMM}mm; }`;
+}
+function clearThermalPageStyle(){
+  const s = document.getElementById('thermal-page-style');
+  if(s) s.textContent = '';
+}
+function printPiecesThermalQR(ids){
+  const pieces = (ids||[]).map(id=> state.pieces.find(x=>x.id===id)).filter(Boolean);
+  if(!pieces.length){ toast('اختار قطعة واحدة على الأقل'); return; }
+  const {w,h} = thermalLabelSize();
+  let area = document.getElementById('print-area');
+  if(!area){ area = document.createElement('div'); area.id='print-area'; document.body.appendChild(area); }
+  area.innerHTML = pieces.map(p=>pieceThermalQRLabelHTML(p)).join('');
+  setThermalPageStyle(w,h);
+  document.body.classList.add('print-barcodes');
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ document.body.classList.remove('print-barcodes'); clearThermalPageStyle(); }, 500);
+  }, 80);
 }
 function pieceQRLabelHTML(p){
   const i = pieceQRInfo(p);
@@ -2240,7 +2303,8 @@ function showPieceQRModal(ids){
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>
-          <button class="btn btn-gold" onclick='printPieceQRs(${JSON.stringify(pieces.map(p=>p.id))})'>🖶 طباعة</button>
+          <button class="btn btn-ghost" onclick='printPiecesThermalQR(${JSON.stringify(pieces.map(p=>p.id))})'>🖶 طباعة على الحرارية (Zebra)</button>
+          <button class="btn btn-gold" onclick='printPieceQRs(${JSON.stringify(pieces.map(p=>p.id))})'>🖶 طباعة (A4)</button>
         </div>
       </div>
     </div>`;
@@ -3381,6 +3445,7 @@ function submitPurchaseBuilderInvoice(){
   const merchantId = pb.merchantId;
   const finalSerialCursor = pb.serialCursor;
 
+  let generatedPieceIds = [];
   mutate(()=>{
     const m = merchantById(merchantId);
     // الذهب: يدخل مخزون الخزينة، ويتقيد للتاجر (سالب = ليه علينا)
@@ -3401,12 +3466,15 @@ function submitPurchaseBuilderInvoice(){
     state.purchaseInvoices.push(rec);
 
     items.forEach(it=>{
-      state.pieces.push({id:uid('pc'), uid:newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
+      const pieceId = uid('pc');
+      state.pieces.push({id:pieceId, uid:newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
+      generatedPieceIds.push(pieceId);
     });
     state.counters.piece = finalSerialCursor;
   }, pbEditId? ('تم حفظ تعديل الفاتورة #'+pbEditNo) : 'تم حفظ فاتورة الشراء');
   pb = null; pbEditId=null; pbEditNo=null; pbEditDate=null; pbEditCreatedAt=null;
   goto('purchases');
+  if(generatedPieceIds.length) setTimeout(()=>showPieceQRModal(generatedPieceIds), 150);
 }
 
 function openInvoiceModal(kind){
@@ -3475,7 +3543,7 @@ function submitInvoice(kind){
   }, 'تم حفظ الفاتورة');
   closeModal();
   if(isPurchase && generatedPieces.length){
-    showPiecesBarcodeModal(generatedPieces);
+    showPieceQRModal(generatedPieces.map(p=>p.id));
   }
 }
 
