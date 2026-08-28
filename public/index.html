@@ -1207,6 +1207,7 @@ function render(){
     'system-code': renderSystemCode,
     'gold-prices': renderGoldPrices,
     backup: renderBackup,
+    'thermal-template': renderThermalTemplateEditor,
   };
   main.innerHTML = renderers[currentView] ? renderers[currentView]() : '<p>غير موجود</p>';
   if(pendingFocusId){
@@ -2119,6 +2120,9 @@ function renderPieces(){
         <div class="f" style="align-self:flex-end;">
           <button class="btn btn-sm btn-ghost" onclick="printThermalTestTicket()" type="button">🖶 طباعة تيكت اختبار (مسطرة)</button>
         </div>
+        <div class="f" style="align-self:flex-end;">
+          <button class="btn btn-sm btn-gold" onclick="openThermalTemplateEditor()" type="button">🎨 تصميم قالب التيكت</button>
+        </div>
       </div>
     </div>
 
@@ -2240,13 +2244,51 @@ function pieceQRInfo(p){
     sold: !!p.sold
   };
 }
-function pieceThermalQRLabelHTML(p){
+function tplFieldValue(type, p){
+  switch(type){
+    case 'shopName': return shopName();
+    case 'itemType': return pieceLabel(p);
+    case 'karat': return p.karat+'K';
+    case 'weight': return Number(p.weight).toFixed(3);
+    case 'code': return pieceCode(p);
+    case 'merchantName': return p.merchantId? merchantName(p.merchantId) : '';
+    case 'uid': return p.uid||tagBarcodeValue(p);
+    default: return '';
+  }
+}
+function pieceThermalQRCellHTML(p, flip){
+  const tpl = state.settings && state.settings.thermalTemplate;
+  if(tpl && tpl.elements && tpl.elements.length){
+    const elsHTML = tpl.elements.map(el=>{
+      if(el.type==='qr'){
+        const svg = qrSVG(pieceQRPayload(p), {scale:3, quiet:0}) || '';
+        return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.w}mm;height:${el.h}mm;transform:rotate(${el.rotate||0}deg);">${svg}</div>`;
+      }
+      if(el.type==='image'){
+        return el.img? `<img src="${esc(el.img)}" style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.w}mm;height:${el.h}mm;object-fit:contain;transform:rotate(${el.rotate||0}deg);">` : '';
+      }
+      const txt = el.type==='text'? (el.text||'') : tplFieldValue(el.type, p);
+      return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.w}mm;height:${el.h}mm;font-size:${el.fontSize}pt;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;font-family:'Tajawal',sans-serif;transform:rotate(${el.rotate||0}deg);">${esc(txt)}</div>`;
+    }).join('');
+    return `<div class="ticket-cell${flip?' flip':''}" style="position:relative;">${elsHTML}</div>`;
+  }
   const svg = qrSVG(pieceQRPayload(p), {scale:3, quiet:1}) || '';
-  return `<div class="ticket">
+  return `<div class="ticket-cell${flip?' flip':''}">
     <div class="ticket-shop">${esc(shopName())}</div>
+    <div class="ticket-type">${esc(pieceLabel(p))}</div>
+    <div class="ticket-line"><span>${p.karat}K</span><span>${Number(p.weight).toFixed(3)}</span></div>
     <div class="ticket-qr">${svg}</div>
-    <div class="ticket-line"><span>ع${p.karat}</span><span>${Number(p.weight).toFixed(3)}</span></div>
     <div class="ticket-sn">${esc(p.uid||tagBarcodeValue(p))}</div>
+  </div>`;
+}
+function pieceThermalQREmptyCellHTML(flip){
+  return `<div class="ticket-cell empty${flip?' flip':''}"></div>`;
+}
+function pieceThermalQRPairHTML(p1, p2){
+  return `<div class="ticket-pair">
+    ${pieceThermalQRCellHTML(p1,false)}
+    <div class="ticket-gap"></div>
+    ${p2? pieceThermalQRCellHTML(p2,true) : pieceThermalQREmptyCellHTML(true)}
   </div>`;
 }
 /* ---------- تيكت اختبار (مسطرة ملم) لمعايرة مقاس الطباعة الحرارية ---------- */
@@ -2289,7 +2331,8 @@ function printThermalTestTicket(){
 function setThermalPageStyle(wMM,hMM){
   const s = document.getElementById('thermal-page-style');
   if(s) s.textContent = `@page{ size:${wMM}mm ${hMM}mm; margin:0; }
-    #print-area .ticket{ width:${wMM}mm; height:${hMM}mm; }`;
+    #print-area .test-ticket{ width:${wMM}mm; height:${hMM}mm; }
+    #print-area .ticket-pair{ width:${wMM}mm; height:${hMM}mm; }`;
 }
 function clearThermalPageStyle(){
   const s = document.getElementById('thermal-page-style');
@@ -2301,14 +2344,239 @@ function printPiecesThermalQR(ids){
   const {w,h} = thermalLabelSize();
   let area = document.getElementById('print-area');
   if(!area){ area = document.createElement('div'); area.id='print-area'; document.body.appendChild(area); }
-  area.innerHTML = pieces.map(p=>pieceThermalQRLabelHTML(p)).join('');
-  setThermalPageStyle(w,h);
+  let html = '';
+  for(let i=0;i<pieces.length;i+=2){
+    html += pieceThermalQRPairHTML(pieces[i], pieces[i+1]);
+  }
+  area.innerHTML = html;
+  setThermalPageStyle(w*2, h);
   document.body.classList.add('print-barcodes');
   setTimeout(()=>{
     window.print();
     setTimeout(()=>{ document.body.classList.remove('print-barcodes'); clearThermalPageStyle(); }, 500);
   }, 80);
 }
+
+/* ============================= قالب تصميم التيكت (Templates) ============================= */
+const TPL_SCALE = 7; // px لكل مم في شاشة التصميم
+let tplEditor = null; // {elements:[{id,type,x,y,w,h,fontSize,text,rotate,img}], selectedId}
+let tplDrag = null;
+
+const TPL_TYPE_NAMES = {
+  qr:'QR Code', shopName:'اسم المحل', itemType:'اسم الصنف', karat:'عيار الذهب',
+  weight:'وزن الذهب', code:'كود القطعة', merchantName:'اسم التاجر', uid:'الكود الفريد',
+  text:'نص حر', image:'صورة'
+};
+
+function newTplElement(type){
+  const defaults = {
+    qr:{w:16,h:16,fontSize:0}, shopName:{w:26,h:5,fontSize:2.6}, itemType:{w:22,h:5,fontSize:2.4},
+    karat:{w:12,h:4,fontSize:2.4}, weight:{w:14,h:4,fontSize:2.4}, code:{w:18,h:4,fontSize:2},
+    merchantName:{w:22,h:4,fontSize:2}, uid:{w:24,h:3.5,fontSize:1.8}, text:{w:20,h:4,fontSize:2.2},
+    image:{w:12,h:12,fontSize:0}
+  };
+  const d = defaults[type]||{w:16,h:5,fontSize:2.2};
+  return {id:'el'+Math.random().toString(36).slice(2,9), type, x:2, y:2, w:d.w, h:d.h, fontSize:d.fontSize,
+    text: type==='text'? 'نص' : '', rotate:0, img: type==='image'? '' : undefined};
+}
+function openThermalTemplateEditor(){
+  const saved = state.settings && state.settings.thermalTemplate;
+  tplEditor = { elements: saved && saved.elements? JSON.parse(JSON.stringify(saved.elements)) : [], selectedId:null };
+  goto('thermal-template');
+}
+function tplSampleFieldText(type){
+  const p = state.pieces && state.pieces[0];
+  switch(type){
+    case 'shopName': return shopName();
+    case 'itemType': return p? pieceLabel(p) : 'خاتم';
+    case 'karat': return (p? p.karat : 21)+'K';
+    case 'weight': return p? Number(p.weight).toFixed(3) : '5.250';
+    case 'code': return p? pieceCode(p) : 'P-001';
+    case 'merchantName': return (p && p.merchantId)? merchantName(p.merchantId) : 'اسم التاجر';
+    case 'uid': return p? (p.uid||tagBarcodeValue(p)) : 'GS-000001-ABCD';
+    default: return '';
+  }
+}
+function tplElementHTML(el){
+  const x=el.x*TPL_SCALE, y=el.y*TPL_SCALE, w=el.w*TPL_SCALE, h=el.h*TPL_SCALE;
+  const sel = tplEditor.selectedId===el.id;
+  let inner='';
+  if(el.type==='qr'){
+    inner = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#eee,#eee 4px,#fff 4px,#fff 8px);font-size:11px;color:#888;font-weight:800;">QR</div>`;
+  } else if(el.type==='image'){
+    inner = el.img? `<img src="${esc(el.img)}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f2f2f2;font-size:10px;color:#888;">صورة</div>`;
+  } else {
+    const txt = el.type==='text'? (el.text||'نص') : tplSampleFieldText(el.type);
+    inner = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:${(el.fontSize*TPL_SCALE/2.2).toFixed(1)}px;font-family:'Tajawal',sans-serif;white-space:nowrap;overflow:hidden;pointer-events:none;">${esc(txt)}</div>`;
+  }
+  return `<div class="tpl-el" data-id="${el.id}" style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;
+    border:1px ${sel?'solid #d4af37':'dashed #999'};box-sizing:border-box;cursor:move;background:${sel?'rgba(212,175,55,.08)':'transparent'};
+    transform:rotate(${el.rotate||0}deg);" onmousedown="tplElMouseDown(event,'${el.id}')">
+    ${inner}
+    ${sel? `<div onmousedown="tplResizeMouseDown(event,'${el.id}')" style="position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;background:#d4af37;border-radius:2px;cursor:nwse-resize;"></div>` : ''}
+  </div>`;
+}
+function tplSelectedPanelHTML(){
+  const el = tplEditor.elements.find(x=>x.id===tplEditor.selectedId);
+  if(!el) return '<p class="muted" style="font-size:12.5px;">دوس على أي عنصر في التصميم عشان تعدله من هنا</p>';
+  return `
+    <div style="font-weight:800;margin-bottom:10px;">${TPL_TYPE_NAMES[el.type]||el.type}</div>
+    ${el.type==='text'? `<div class="field"><label>النص</label><input value="${esc(el.text||'')}" onchange="tplUpdateSelected('text', this.value)"></div>` : ''}
+    <div class="row">
+      <div class="field"><label>X (مم)</label><input type="number" step="0.5" value="${el.x.toFixed(1)}" onchange="tplUpdateSelected('x', this.value)"></div>
+      <div class="field"><label>Y (مم)</label><input type="number" step="0.5" value="${el.y.toFixed(1)}" onchange="tplUpdateSelected('y', this.value)"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>العرض (مم)</label><input type="number" step="0.5" value="${el.w.toFixed(1)}" onchange="tplUpdateSelected('w', this.value)"></div>
+      <div class="field"><label>الطول (مم)</label><input type="number" step="0.5" value="${el.h.toFixed(1)}" onchange="tplUpdateSelected('h', this.value)"></div>
+    </div>
+    ${(el.type!=='qr' && el.type!=='image')? `<div class="field"><label>حجم الخط (نقطة)</label><input type="number" step="0.2" value="${el.fontSize.toFixed(1)}" onchange="tplUpdateSelected('fontSize', this.value)"></div>` : ''}
+    <div class="field"><label>تدوير (درجة)</label><input type="number" step="15" value="${el.rotate||0}" onchange="tplUpdateSelected('rotate', this.value)"></div>
+    <button class="btn btn-sm btn-ghost" style="margin-top:4px;color:#c0392b;" onclick="tplDeleteSelected()">🗑 حذف العنصر</button>
+  `;
+}
+function renderThermalTemplateEditor(){
+  if(!tplEditor) openThermalTemplateEditor();
+  const {w,h} = thermalLabelSize();
+  const cw = (w*TPL_SCALE).toFixed(0), ch=(h*TPL_SCALE).toFixed(0);
+  const els = tplEditor.elements.map(el=>tplElementHTML(el)).join('');
+  return `
+    <div class="pagehead">
+      <div><h1>تصميم قالب التيكت</h1><p>حط كل عنصر مكانه بالظبط زي ما هيتطبع على التيكت الحقيقي — العرض والطول مأخوذين من مقاس التيكت في صفحة باركود القطع (${w}×${h} مم)</p></div>
+      <div>${navBtn('pieces','→ رجوع لباركود القطع')}</div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button class="btn btn-sm btn-gold" onclick="tplAddElement('qr')">＋ QR Code</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('shopName')">＋ اسم المحل</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('itemType')">＋ اسم الصنف</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('karat')">＋ عيار الذهب</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('weight')">＋ وزن الذهب</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('code')">＋ كود القطعة</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('merchantName')">＋ اسم التاجر</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('uid')">＋ الكود الفريد</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddElement('text')">＋ Text</button>
+        <button class="btn btn-sm btn-ghost" onclick="tplAddImageElement()">＋ صورة</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+      <div id="tpl-canvas" style="position:relative;width:${cw}px;height:${ch}px;background:#fff;border:2px solid #999;
+        overflow:hidden;flex:none;" onmousedown="tplCanvasMouseDown(event)">${els}</div>
+      <div class="card" style="min-width:230px;flex:none;">
+        ${tplSelectedPanelHTML()}
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold" onclick="saveThermalTemplate()">💾 حفظ القالب</button>
+          <button class="btn btn-ghost" onclick="tplPreview()">👁 معاينة طباعة</button>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-sm btn-ghost" style="color:#c0392b;" onclick="clearThermalTemplate()">مسح القالب والرجوع للتصميم الافتراضي</button>
+        </div>
+      </div>
+    </div>`;
+}
+function tplSelect(id){ tplEditor.selectedId=id; render(); }
+function tplCanvasMouseDown(e){ if(e.target && e.target.id==='tpl-canvas'){ tplEditor.selectedId=null; render(); } }
+function tplAddElement(type){
+  if(!tplEditor) tplEditor={elements:[],selectedId:null};
+  const el = newTplElement(type);
+  tplEditor.elements.push(el);
+  tplEditor.selectedId = el.id;
+  render();
+}
+function tplAddImageElement(){
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.onchange = ()=>{
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const el = newTplElement('image');
+      el.img = reader.result;
+      tplEditor.elements.push(el);
+      tplEditor.selectedId = el.id;
+      render();
+    };
+    reader.readAsDataURL(f);
+  };
+  inp.click();
+}
+function tplDeleteSelected(){
+  if(!tplEditor.selectedId) return;
+  tplEditor.elements = tplEditor.elements.filter(x=>x.id!==tplEditor.selectedId);
+  tplEditor.selectedId = null;
+  render();
+}
+function tplUpdateSelected(field, val){
+  const el = tplEditor.elements.find(x=>x.id===tplEditor.selectedId);
+  if(!el) return;
+  if(field==='text') el.text = val;
+  else el[field] = parseFloat(val)||0;
+  render();
+}
+function tplElMouseDown(e, id){
+  e.stopPropagation();
+  if(tplEditor.selectedId!==id){ tplEditor.selectedId=id; render(); }
+  const el = tplEditor.elements.find(x=>x.id===id);
+  if(!el) return;
+  tplDrag = {id, mode:'move', startX:e.clientX, startY:e.clientY, origX:el.x, origY:el.y};
+  document.addEventListener('mousemove', tplMouseMove);
+  document.addEventListener('mouseup', tplMouseUp);
+}
+function tplResizeMouseDown(e, id){
+  e.stopPropagation();
+  const el = tplEditor.elements.find(x=>x.id===id);
+  if(!el) return;
+  tplDrag = {id, mode:'resize', startX:e.clientX, startY:e.clientY, origW:el.w, origH:el.h};
+  document.addEventListener('mousemove', tplMouseMove);
+  document.addEventListener('mouseup', tplMouseUp);
+}
+function tplMouseMove(e){
+  if(!tplDrag) return;
+  const el = tplEditor.elements.find(x=>x.id===tplDrag.id);
+  if(!el) return;
+  const dxMM = (e.clientX - tplDrag.startX)/TPL_SCALE;
+  const dyMM = (e.clientY - tplDrag.startY)/TPL_SCALE;
+  const domEl = document.querySelector(`.tpl-el[data-id="${tplDrag.id}"]`);
+  if(tplDrag.mode==='move'){
+    el.x = Math.max(0, tplDrag.origX + dxMM);
+    el.y = Math.max(0, tplDrag.origY + dyMM);
+    if(domEl){ domEl.style.left=(el.x*TPL_SCALE)+'px'; domEl.style.top=(el.y*TPL_SCALE)+'px'; }
+  } else {
+    el.w = Math.max(3, tplDrag.origW + dxMM);
+    el.h = Math.max(3, tplDrag.origH + dyMM);
+    if(domEl){ domEl.style.width=(el.w*TPL_SCALE)+'px'; domEl.style.height=(el.h*TPL_SCALE)+'px'; }
+  }
+}
+function tplMouseUp(){
+  tplDrag = null;
+  document.removeEventListener('mousemove', tplMouseMove);
+  document.removeEventListener('mouseup', tplMouseUp);
+  render();
+}
+function saveThermalTemplate(){
+  mutate(()=>{
+    state.settings = state.settings||{};
+    state.settings.thermalTemplate = { elements: tplEditor.elements.map(e=>({...e})) };
+  }, 'تم حفظ قالب التيكت');
+}
+function clearThermalTemplate(){
+  mutate(()=>{
+    state.settings = state.settings||{};
+    delete state.settings.thermalTemplate;
+  }, 'تم مسح القالب — هيرجع للتصميم الافتراضي');
+  tplEditor = { elements:[], selectedId:null };
+  render();
+}
+function tplPreview(){
+  const p = state.pieces && state.pieces[0];
+  if(!p){ toast('لسه مفيش قطع اتسجلت في المخزن للمعاينة'); return; }
+  const prevTpl = state.settings && state.settings.thermalTemplate;
+  state.settings = state.settings||{};
+  state.settings.thermalTemplate = { elements: tplEditor.elements.map(e=>({...e})) };
+  printPiecesThermalQR([p.id]);
+  state.settings.thermalTemplate = prevTpl;
+}
+
 function pieceQRLabelHTML(p){
   const i = pieceQRInfo(p);
   const svg = qrSVG(pieceQRPayload(p), {scale:3, quiet:2}) || '';
