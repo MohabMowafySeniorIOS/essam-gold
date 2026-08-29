@@ -927,6 +927,46 @@ function toast(msg){
   setTimeout(()=>{ el.remove(); }, 2400);
 }
 function closeModal(){ document.getElementById('modal-root').innerHTML=''; uiState.lotPresetPartyId=null; uiState.transferPresetFrom=null; }
+function superPassword(){ return (state.settings && state.settings.superPassword) || ''; }
+function setSuperPassword(v){
+  mutate(()=>{ state.settings = state.settings||{}; state.settings.superPassword = String(v||'').trim(); },
+    v? 'تم حفظ كلمة مرور السوبر يوزر' : 'تم مسح كلمة مرور السوبر يوزر');
+}
+/* بروبت كلمة مرور السوبر يوزر عشان يتخطى قفل الـ24 ساعة على فاتورة معينة — onGranted بتتنفذ لو الباسورد صح */
+function promptSuperPassword(action, onGranted){
+  const pass = superPassword();
+  if(!pass){
+    toast('مينفعش '+action+' — عدّى أكتر من ٢٤ ساعة، ولسه معملتش كلمة مرور سوبر يوزر (من صفحة باركود القطع)');
+    return;
+  }
+  const root=document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-width:380px;">
+        <h2>🔒 مطلوب صلاحية سوبر يوزر</h2>
+        <div class="hint" style="margin-bottom:10px;">عدّى أكتر من 24 ساعة على الفاتورة دي — ${esc(action)} محتاج كلمة مرور السوبر يوزر.</div>
+        <div class="field"><label>كلمة المرور</label>
+          <input type="password" id="super-pass-input" placeholder="••••••"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('super-pass-btn').click();}">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
+          <button class="btn btn-gold" id="super-pass-btn">دخول</button>
+        </div>
+      </div>
+    </div>`;
+  const input = document.getElementById('super-pass-input');
+  input.focus();
+  document.getElementById('super-pass-btn').onclick = function(){
+    if(input.value === pass){
+      closeModal();
+      onGranted();
+    } else {
+      toast('كلمة المرور غلط');
+      input.value=''; input.focus();
+    }
+  };
+}
 function showConfirmModal(message, onYes, opts){
   opts = opts || {};
   const root=document.getElementById('modal-root');
@@ -2116,6 +2156,10 @@ function renderPieces(){
         <div class="f" style="min-width:110px;">
           <label style="margin-bottom:4px;">طول تيكت الحرارية (مم)</label>
           <input type="number" step="1" value="${thermalLabelSize().h}" onchange="setThermalLabelSize(null, this.value)">
+        </div>
+        <div class="f" style="min-width:180px;">
+          <label style="margin-bottom:4px;">كلمة مرور السوبر يوزر (لتخطي قفل الـ24 ساعة)</label>
+          <input type="password" placeholder="اتركها فاضية = بدون سوبر يوزر" value="${esc(superPassword())}" onchange="setSuperPassword(this.value)">
         </div>
         <div class="f" style="align-self:flex-end;">
           <button class="btn btn-sm btn-ghost" onclick="printThermalTestTicket()" type="button">🖶 طباعة تيكت اختبار (مسطرة)</button>
@@ -3383,7 +3427,7 @@ function renderPurchaseBuilder(){
   if(!pb) resetPurchaseBuilder();
   const merchant = merchantById(pb.merchantId);
   const cashBal = merchant? merchant.balanceCash : 0;
-  const goldBal = merchant? (merchant.balanceGold[pb.karat]||0) : 0;
+  const goldBal = merchant? goldTo21(merchant.balanceGold) : 0;
   const totalWeight = pb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = pb.items.reduce((s,i)=>s+(i.making||0),0);
 
@@ -3411,7 +3455,7 @@ function renderPurchaseBuilder(){
         </div>
         <div class="stat" style="margin:0;"><div class="label"><span>رصيد نقدية التاجر${cashBal>0?' — لنا':cashBal<0?' — علينا':''}</span></div>
           <div class="value" style="font-size:17px;color:${cashBal>0?'var(--green)':cashBal<0?'var(--red)':'var(--muted-2)'};">${fmtCash(Math.abs(cashBal))}</div></div>
-        <div class="stat" style="margin:0;"><div class="label"><span>رصيد ذهب التاجر (عيار ${pb.karat})${goldBal>0?' — لنا':goldBal<0?' — علينا':''}</span></div>
+        <div class="stat" style="margin:0;"><div class="label"><span>رصيد ذهب التاجر (ع${BASE_KARAT})${goldBal>0?' — لنا':goldBal<0?' — علينا':''}</span></div>
           <div class="value" style="font-size:17px;color:${goldBal>0?'var(--green)':goldBal<0?'var(--red)':'var(--muted-2)'};">${fmtW(Math.abs(goldBal))}</div></div>
       </div>
     </div>
@@ -3444,7 +3488,8 @@ function renderPurchaseBuilder(){
         </div>
         <div class="row">
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
-          <div class="field" style="display:flex;align-items:flex-end;">
+          <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
+            ${pbEditId? `<button class="btn btn-ghost" onclick="printInvoicePieceQRs('${pbEditId}')" type="button">🖶 طباعة QR القطع</button>` : ''}
             <button class="btn btn-gold" style="width:100%;" onclick="submitPurchaseBuilderInvoice()">حفظ الفاتورة</button>
           </div>
         </div>
@@ -3657,7 +3702,7 @@ function tryReopenInvoice(kind, id){
   const inv = invoiceBucket(kind).find(x=>x.id===id);
   if(!inv) return;
   if(!invoiceWithinWindow(inv)){
-    toast('عدّى 24 ساعة على الفاتورة — مش هتتفتح للتعديل غير باسكان الكيو آر كود');
+    promptSuperPassword('فتح الفاتورة للتعديل', ()=> reopenInvoice(kind, id));
     return;
   }
   reopenInvoice(kind, id);
@@ -3683,61 +3728,65 @@ function revertPurchaseInvoice(inv){
   state.purchaseInvoices = state.purchaseInvoices.filter(x=> x.id !== inv.id);
 }
 
-function guardInvoiceChange(inv, action){
-  if(!invoiceWithinWindow(inv)){
-    toast('مينفعش '+action+' — عدّى أكتر من ٢٤ ساعة على الفاتورة');
-    return false;
-  }
+function guardInvoiceChange(inv, action, onGranted){
   const sold = invoiceSoldPieces(inv);
   if(sold){
     toast('مينفعش '+action+' — فيه '+sold+' قطعة من الفاتورة دي اتباعت بالفعل');
-    return false;
+    return;
   }
-  return true;
+  if(invoiceWithinWindow(inv)){ onGranted(); return; }
+  promptSuperPassword(action, onGranted);
 }
 
 function deletePurchaseInvoice(id){
   const inv = state.purchaseInvoices.find(x=>x.id===id);
   if(!inv) return;
-  if(!guardInvoiceChange(inv,'الحذف')) return;
-  const w = (inv.totalWeight!=null? inv.totalWeight : (inv.items||[]).reduce((a,b)=>a+b.weight,0))||0;
-  showConfirmModal('حذف فاتورة الشراء رقم #'+inv.no+'؟ هيترجع '+w.toFixed(3)+' جم من المخزون ويتلغي قيدها على حساب التاجر، والقطع بتاعتها هتتشال.', ()=>{
-    mutate(()=>{ revertPurchaseInvoice(inv); }, 'تم حذف الفاتورة وإلغاء قيدها');
-    closeModal();
-  }, {confirmLabel:'حذف الفاتورة'});
+  guardInvoiceChange(inv,'الحذف', ()=>{
+    const w = (inv.totalWeight!=null? inv.totalWeight : (inv.items||[]).reduce((a,b)=>a+b.weight,0))||0;
+    showConfirmModal('حذف فاتورة الشراء رقم #'+inv.no+'؟ هيترجع '+w.toFixed(3)+' جم من المخزون ويتلغي قيدها على حساب التاجر، والقطع بتاعتها هتتشال.', ()=>{
+      mutate(()=>{ revertPurchaseInvoice(inv); }, 'تم حذف الفاتورة وإلغاء قيدها');
+      closeModal();
+    }, {confirmLabel:'حذف الفاتورة'});
+  });
 }
 
 function editPurchaseInvoice(id){
   const inv = state.purchaseInvoices.find(x=>x.id===id);
   if(!inv) return;
-  if(!guardInvoiceChange(inv,'التعديل')) return;
-  const pieces = state.pieces.filter(p=>p.invoiceId===inv.id);
-  pbEditId = inv.id; pbEditNo = inv.no; pbEditDate = inv.date; pbEditCreatedAt = inv.createdAt || new Date().toISOString();
-  pb = {
-    merchantId: inv.merchantId,
-    karat: inv.karat || merchantKarat(merchantById(inv.merchantId)),
-    search:'', classFilter:'', selectedProductId:null,
-    items: (inv.items||[]).map((it,i)=>{
-      const pc = pieces[i];
-      const prod = it.productCode? state.products.find(x=>x.code===it.productCode) : null;
-      const itn = state.itemTypes.find(x=>x.id===it.itemTypeId);
-      const cln = state.classifications.find(x=>x.id===it.classificationId);
-      return {
-        tempId: uid('dft'), productId: prod? prod.id : (pc? pc.productId : null), code: it.productCode||'—',
-        itemName: itn? itn.name : '—', classificationName: cln? cln.name : '—',
-        itemTypeId: it.itemTypeId, classificationId: it.classificationId, priceCategoryId: it.priceCategoryId,
-        price: it.price||it.makingPerGram||0, making: it.making!=null? it.making : (it.weight*(it.price||0)),
-        weight: it.weight, karat: it.karat, lineTotal: it.making!=null? it.making : (it.weight*(it.price||0)),
-        serial: pc? pc.no : state.counters.piece, barcodeValue: pc? pc.barcodeValue : buildBarcodeValue(it.karat, it.weight, state.counters.piece)
-      };
-    }),
-    serialCursor: state.counters.piece
-  };
-  // شيل القيد القديم دلوقتي عشان الشاشة تبان بالأرصدة الصح، وهيتسجل من جديد عند الحفظ
-  mutate(()=>{ revertPurchaseInvoice(inv); }, 'فتحت الفاتورة #'+inv.no+' للتعديل');
-  goto('purchase-builder');
+  guardInvoiceChange(inv,'التعديل', ()=>{
+    const pieces = state.pieces.filter(p=>p.invoiceId===inv.id);
+    pbEditId = inv.id; pbEditNo = inv.no; pbEditDate = inv.date; pbEditCreatedAt = inv.createdAt || new Date().toISOString();
+    pb = {
+      merchantId: inv.merchantId,
+      karat: inv.karat || merchantKarat(merchantById(inv.merchantId)),
+      search:'', classFilter:'', selectedProductId:null,
+      items: (inv.items||[]).map((it,i)=>{
+        const pc = pieces[i];
+        const prod = it.productCode? state.products.find(x=>x.code===it.productCode) : null;
+        const itn = state.itemTypes.find(x=>x.id===it.itemTypeId);
+        const cln = state.classifications.find(x=>x.id===it.classificationId);
+        return {
+          tempId: uid('dft'), productId: prod? prod.id : (pc? pc.productId : null), code: it.productCode||'—',
+          itemName: itn? itn.name : '—', classificationName: cln? cln.name : '—',
+          itemTypeId: it.itemTypeId, classificationId: it.classificationId, priceCategoryId: it.priceCategoryId,
+          price: it.price||it.makingPerGram||0, making: it.making!=null? it.making : (it.weight*(it.price||0)),
+          weight: it.weight, karat: it.karat, lineTotal: it.making!=null? it.making : (it.weight*(it.price||0)),
+          serial: pc? pc.no : state.counters.piece, barcodeValue: pc? pc.barcodeValue : buildBarcodeValue(it.karat, it.weight, state.counters.piece)
+        };
+      }),
+      serialCursor: state.counters.piece
+    };
+    // شيل القيد القديم دلوقتي عشان الشاشة تبان بالأرصدة الصح، وهيتسجل من جديد عند الحفظ
+    mutate(()=>{ revertPurchaseInvoice(inv); }, 'فتحت الفاتورة #'+inv.no+' للتعديل');
+    goto('purchase-builder');
+  });
 }
 
+function printInvoicePieceQRs(invoiceId){
+  const pieces = state.pieces.filter(p=>p.invoiceId===invoiceId);
+  if(!pieces.length){ toast('مفيش قطع مرتبطة بالفاتورة دي'); return; }
+  showPieceQRModal(pieces.map(p=>p.id));
+}
 function submitPurchaseBuilderInvoice(){
   if(!pb.items.length){ toast('أضف قطعة واحدة على الأقل'); return; }
   if(!pb.merchantId){ toast('اختر التاجر'); return; }
@@ -5513,7 +5562,7 @@ function renderCustomerSales(){
           const pills = invItemsSummary(inv.items,'gold');
           const editable = invoiceWithinWindow(inv);
           const due = (inv.totalAll!=null? inv.totalAll : (inv.totalCash||inv.totalMaking||0));
-          return `<tr class="${editable?'row-editable':''}" ${editable? `ondblclick="tryReopenInvoice('CS','${inv.id}')" title="دوس مرتين عشان تفتح الفاتورة للتعديل"` : `title="عدّى 24 ساعة — التعديل بالكيو آر كود بس"`}>
+          return `<tr class="${editable?'row-editable':''}" ondblclick="tryReopenInvoice('CS','${inv.id}')" title="${editable? 'دوس مرتين عشان تفتح الفاتورة للتعديل' : 'عدّى 24 ساعة — محتاج كلمة مرور سوبر يوزر'}">
             <td class="mono">#${inv.no}</td>
             <td class="muted num">${fmtDateRep(inv.date)}</td>
             <td>${esc(customerName(inv.customerId))}</td>
@@ -5525,7 +5574,7 @@ function renderCustomerSales(){
             <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
               <b class="num" style="color:var(--navy);">${Number(due).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(Number(due).toFixed(2))}</span></td>
             <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span></td>
-            <td>${editable? `<button class="btn btn-sm btn-ghost" style="white-space:nowrap;" title="متبقي ${Math.max(0,invoiceHoursLeft(inv)).toFixed(1)} ساعة" onclick="tryReopenInvoice('CS','${inv.id}')">✎ تعديل</button>` : invoiceLockChip(inv)}</td>
+            <td>${editable? `<button class="btn btn-sm btn-ghost" style="white-space:nowrap;" title="متبقي ${Math.max(0,invoiceHoursLeft(inv)).toFixed(1)} ساعة" onclick="tryReopenInvoice('CS','${inv.id}')">✎ تعديل</button>` : `<span style="cursor:pointer;" onclick="tryReopenInvoice('CS','${inv.id}')">${invoiceLockChip(inv)}</span>`}</td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-ghost" onclick="showInvoiceQR('CS','${inv.id}')">▣ كيو آر</button>
               <button class="btn btn-sm btn-ghost" onclick="openInvoiceView('CS','${inv.id}')">تفاصيل</button>
