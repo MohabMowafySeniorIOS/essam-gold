@@ -737,6 +737,7 @@ function defaultState(){
     pendingSales: [],
     settlements: [],
     yearClosings: [],
+    goldLosses: [],
     transfers: [],
     scrapPurchases: [],
     cashMoves: [],
@@ -1024,6 +1025,7 @@ const NAV = [
     {id:'catalog', label:'الأصناف والمنتجات', icon:'▤'},
     {id:'pieces', label:'باركود القطع', icon:'▥'},
     {id:'piece-lookup', label:'اسكان قطعة / تحركاتها', icon:'🔍'},
+    {id:'piece-return', label:'مرتجع قطع ذهب', icon:'↩'},
   ]},
   {group:'التجار', items:[
     {id:'merchants', label:'التجار وأكوادهم', icon:'⌘'},
@@ -1223,6 +1225,7 @@ function render(){
     catalog: renderCatalog,
     pieces: renderPieces,
     'piece-lookup': renderPieceLookup,
+    'piece-return': renderPieceReturn,
     merchants: renderMerchants,
     'merchant-summary': renderMerchantSummary,
     'merchant-statement': renderMerchantStatement,
@@ -2157,6 +2160,7 @@ function renderPieces(){
       <div><h1>باركود القطع</h1><p>القطع الموجودة في المخزن حاليًا — أي قطعة تتباع في فاتورة بتخرج من الصفحة دي تلقائيًا</p></div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
         ${navBtn('piece-lookup','🔍 اسكان قطعة')}
+        ${navBtn('piece-return','↩ مرتجع قطع ذهب')}
         <div class="f" style="min-width:210px;">
           <label style="margin-bottom:4px;">اسم المحل على الملصق</label>
           <input value="${esc(shopName())}" placeholder="اسم المحل" onchange="setShopName(this.value)">
@@ -2235,7 +2239,7 @@ function renderPieces(){
             <td>${product? esc(productLabel(product)) : (esc(pieceLabel(p))+' / '+esc(classificationName(pieceClassificationId(p))))}</td>
             <td><span class="pill pill-gold">ع${p.karat}</span></td>
             <td class="num" style="font-weight:700;">${fmtW(p.weight)}</td>
-            <td><span class="pill ${p.sold?'pill-red':'pill-green'}">${p.sold?'مباعة':'في الاستوك'}</span></td>
+            <td><span class="pill ${p.returned?'pill-muted':(p.sold?'pill-red':'pill-green')}">${p.returned?(p.returnedKind==='melt'?'اتكسّرت':'اترجعت لتاجر'):(p.sold?'مباعة':'في الاستوك')}</span></td>
             <td><div style="display:flex;gap:5px;justify-content:flex-end;">
               <button class="btn btn-sm btn-gold" title="كيو آر القطعة" onclick="showPieceQRModal(['${p.id}'])">▣ QR</button>
             </div></td>
@@ -3502,6 +3506,7 @@ function renderPurchaseBuilder(){
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
           <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
             ${pbEditId? `<button class="btn btn-ghost" onclick="printInvoicePieceQRs('${pbEditId}')" type="button">🖶 طباعة QR القطع</button>` : ''}
+            ${pbEditId? `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="discardPurchaseEdit()" type="button">🗑 حذف الفاتورة</button>` : ''}
             <button class="btn btn-gold" style="width:100%;" onclick="submitPurchaseBuilderInvoice()">حفظ الفاتورة</button>
           </div>
         </div>
@@ -3761,6 +3766,18 @@ function deletePurchaseInvoice(id){
     }, {confirmLabel:'حذف الفاتورة'});
   });
 }
+/* حذف فاتورة وانت واقف جواها وهي في وضع التعديل — قيدها القديم بيكون اترجع بالفعل لما فتحت التعديل،
+   فهنا بس بنسيب الدرافت ونرجع للقائمة من غير ما نحفظه تاني */
+function discardPurchaseEdit(){
+  if(!pbEditId){ toast('مفيش فاتورة متفتحة للحذف'); return; }
+  const no = pbEditNo;
+  showConfirmModal('حذف فاتورة الشراء #'+no+' نهائيًا؟ التعديلات اللي عملتها في الشاشة دي مش هتتحفظ، والفاتورة القديمة اتلغت بالفعل.', ()=>{
+    pb = null; pbEditId=null; pbEditNo=null; pbEditDate=null; pbEditCreatedAt=null;
+    closeModal();
+    goto('purchases');
+    toast('تم حذف الفاتورة #'+no+' نهائيًا');
+  }, {confirmLabel:'حذف نهائي'});
+}
 
 function editPurchaseInvoice(id){
   const inv = state.purchaseInvoices.find(x=>x.id===id);
@@ -3821,7 +3838,8 @@ function submitPurchaseBuilderInvoice(){
     state.treasury.cash -= paid;
     m.balanceCash -= (totalMaking - paid);
 
-    const invItems = items.map(it=>({karat:it.karat, weight:it.weight, price:it.price, makingPerGram:it.price, making:it.making, total:it.lineTotal, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, productCode:it.code}));
+    const pieceIds = items.map(()=>uid('pc'));
+    const invItems = items.map((it,i)=>({pieceId:pieceIds[i], karat:it.karat, weight:it.weight, price:it.price, makingPerGram:it.price, making:it.making, total:it.lineTotal, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, productCode:it.code}));
     const editing = !!pbEditId;
     const rec = {id: editing? pbEditId : uid('purchase'),
       no: editing? pbEditNo : state.counters.purchase++,
@@ -3831,8 +3849,8 @@ function submitPurchaseBuilderInvoice(){
       totalCash: totalMaking, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid};
     state.purchaseInvoices.push(rec);
 
-    items.forEach(it=>{
-      const pieceId = uid('pc');
+    items.forEach((it,i)=>{
+      const pieceId = pieceIds[i];
       state.pieces.push({id:pieceId, uid:newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
       generatedPieceIds.push(pieceId);
     });
@@ -5629,7 +5647,7 @@ function addCustomerSalePieceByScan(){
     pieceId:piece.id, no:piece.no, code:pieceCode(piece), itemName:pieceLabel(piece),
     classificationId: piece.classificationId || (prod? prod.classificationId : null),
     itemTypeId: piece.itemTypeId || (prod? prod.itemTypeId : null),
-    karat:piece.karat, weight:piece.weight,
+    karat:piece.karat, weight:piece.weight, origWeight:piece.weight,
     goldRate, rate, minRate: rate,
     goldValue: piece.weight*goldRate,
     making: piece.weight*rate,
@@ -5653,6 +5671,15 @@ function recalcCsbLine(it){
   it.goldValue = it.weight * (Number(it.goldRate)||0);
   it.making    = it.weight * (Number(it.rate)||0);
   it.lineTotal = it.goldValue + it.making;
+}
+function setCustomerSaleWeight(pieceId, val){
+  const it = csb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  let v = parseFloat(val)||0;
+  const max = Number(it.origWeight!=null? it.origWeight : it.weight)||0;
+  if(v<=0){ toast('الوزن لازم يكون أكبر من صفر'); render(); return; }
+  if(v > max + 0.0005){ v = max; toast('الوزن مينفعش يكون أكبر من وزن القطعة المكودة ('+fmtW(max)+')'); }
+  it.weight = v; recalcCsbLine(it); saveCsbDraft(); render();
 }
 function csbMinRate(it){ return Number(it.minRate!=null? it.minRate : 0)||0; }
 function setCustomerSaleRate(pieceId, val){
@@ -5828,7 +5855,7 @@ function renderCustomerSaleBuilder(){
               <td>${esc(it.itemName)}</td>
               <td class="muted">${esc(classificationName(it.classificationId))}</td>
               <td class="muted">عيار ${it.karat}</td>
-              <td class="right num">${it.weight.toFixed(3)} جم</td>
+              <td><input type="number" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
               <td><input type="number" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
               <td><input type="number" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
               <td class="total-col">
@@ -5848,6 +5875,7 @@ function renderCustomerSaleBuilder(){
         </tr></tfoot>`:''}
       </table>
     </div>
+    <p class="hint" style="margin-top:-8px;margin-bottom:16px;">تقدر تعدّل وزن أي قطعة لو بتبيع جزء منها بس (زي جزء من طقم) — الفرق بين وزن القطعة الأصلي والوزن المباع هيتحول تلقائي لرصيد الكسر عند الحفظ.</p>
 
     <div class="card" style="margin-bottom:16px;">
       <label>البيان</label>
@@ -5885,14 +5913,17 @@ function submitCustomerSale(){
   mutate(()=>{
     const c = customerById(customerId);
     items.forEach(it=>{
+      const orig = Number(it.origWeight!=null? it.origWeight : it.weight)||it.weight;
+      const remainder = Math.max(0, orig - it.weight);
       state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) - it.weight;
       c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) + it.weight;
       const pc = state.pieces.find(x=>x.id===it.pieceId);
       if(pc){ pc.sold=true; pc.soldDate=todayStr(); pc.soldToCustomerId=customerId; pc.soldKind='customer'; }
+      if(remainder>0.0005){ state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) + remainder; it.remainderToScrap = remainder; }
     });
     state.treasury.cash += paid;
     c.balanceCash += (totalAll - paid);
-    const invItems = items.map(it=>({pieceId:it.pieceId, pieceNo:it.no, karat:it.karat, weight:it.weight,
+    const invItems = items.map(it=>({pieceId:it.pieceId, pieceNo:it.no, karat:it.karat, weight:it.weight, origWeight:it.origWeight||it.weight, remainderToScrap:it.remainderToScrap||0,
       goldRate:it.goldRate, goldValue:it.goldValue,
       price:it.rate, makingPerGram:it.rate, making:it.making, total:it.lineTotal, productCode:it.code,
       itemName:it.itemName, barcodeValue:it.barcodeValue, classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null}));
@@ -5913,6 +5944,7 @@ function deleteCustomerSale(id){
       (inv.items||[]).forEach(it=>{
         state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) + it.weight;
         if(c) c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) - it.weight;
+        if(it.remainderToScrap>0.0005){ state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) - it.remainderToScrap; }
         const pc = state.pieces.find(x=>x.id===it.pieceId);
         if(pc){ pc.sold=false; delete pc.soldDate; delete pc.soldToCustomerId; delete pc.soldKind; }
       });
@@ -6648,7 +6680,7 @@ function renderPiecesReport(){
               <td>${esc(pieceLabel(p))}</td>
               <td class="muted">ع${p.karat}</td>
               <td class="right num">${Number(p.weight||0).toFixed(3)} جم</td>
-              <td><span class="pill ${p.sold?'pill-muted':'pill-green'}">${p.sold?'مباعة':'في المخزن'}</span></td>
+              <td><span class="pill ${p.returned?'pill-muted':(p.sold?'pill-muted':'pill-green')}">${p.returned?(p.returnedKind==='melt'?'اتكسّرت':'اترجعت لتاجر'):(p.sold?'مباعة':'في المخزن')}</span></td>
               <td><button class="btn btn-sm btn-ghost" onclick="showPieceQRModal(['${p.id}'])">▣ QR</button></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لا توجد قطع مطابقة</td></tr>`}
         </tbody>
@@ -7543,6 +7575,148 @@ function pieceMovements(piece){
   state.customerReturns.forEach(inv=>{ if((inv.items||[]).some(i=>i.pieceId===piece.id)) rows.push({date:inv.date, type:'مرتجع من عميل', party:customerName(inv.customerId), ref:'#'+inv.no}); });
   return rows.sort((a,b)=> new Date(a.date)-new Date(b.date));
 }
+/* ============================= مرتجع قطع ذهب (تكسير / إرجاع لتاجر) ============================= */
+let prb = null;
+function openPieceReturnBuilder(){
+  prb = { mode:'melt', merchantId:null, items:[] };
+  goto('piece-return');
+}
+function pieceOriginalMaking(piece){
+  if(!piece.invoiceId) return 0;
+  const inv = state.purchaseInvoices.find(x=>x.id===piece.invoiceId);
+  if(!inv) return 0;
+  let li = (inv.items||[]).find(x=>x.pieceId===piece.id);
+  if(!li) li = (inv.items||[]).find(x=> Math.abs((Number(x.weight)||0)-piece.weight)<0.001 && Number(x.karat)===Number(piece.karat));
+  return li? Number(li.making)||0 : 0;
+}
+function prbSetMode(m){ if(!prb) return; prb.mode=m; render(); }
+function addPrbPieceByScan(){
+  const input = document.getElementById('prb-scan');
+  const raw = input? input.value : '';
+  const piece = findPieceByScan(raw);
+  if(!piece){ toast('الباركود ده مش موجود في القطع'); if(input){input.value=''; input.focus();} return; }
+  if(piece.sold || piece.returned){ toast('القطعة دي مش متاحة (متباعة أو اترجعت قبل كده)'); if(input){input.value=''; input.focus();} return; }
+  if(prb.items.some(x=>x.pieceId===piece.id)){ toast('القطعة دي مضافة بالفعل'); if(input){input.value=''; input.focus();} return; }
+  const making = pieceOriginalMaking(piece);
+  prb.items.push({
+    pieceId:piece.id, no:piece.no, code:pieceCode(piece), itemName:pieceLabel(piece),
+    classificationId:piece.classificationId, karat:piece.karat, weight:piece.weight,
+    making, merchantId: piece.merchantId||null, barcodeValue:piece.barcodeValue
+  });
+  if(input) input.value='';
+  refocusAfterRender('prb-scan');
+  render();
+}
+function removePrbLine(pieceId){ prb.items = prb.items.filter(x=>x.pieceId!==pieceId); refocusAfterRender('prb-scan'); render(); }
+function renderPieceReturn(){
+  if(!prb) prb = { mode:'melt', merchantId:null, items:[] };
+  const isMelt = prb.mode==='melt';
+  const totalWeight = prb.items.reduce((s,i)=>s+i.weight,0);
+  const totalLoss = prb.items.reduce((s,i)=>s+(i.making||0),0);
+  const suggestedMerchant = !prb.merchantId && prb.items.length && prb.items[0].merchantId? prb.items[0].merchantId : prb.merchantId;
+  return `
+    <div class="pagehead">
+      <div><h1>مرتجع قطع ذهب</h1><p>امسح باركود القطعة اللي عاوز ترجّعها — إما تكسير (ترجع كسر) أو إرجاع لتاجر (لو القطعة كانت مشتراة منه)</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="row">
+        <div class="field" style="margin:0;">
+          <label>نوع المرتجع</label>
+          <select onchange="prbSetMode(this.value)">
+            <option value="melt" ${isMelt?'selected':''}>تكسير — ترجع وزن القطعة للكسر</option>
+            <option value="merchant" ${!isMelt?'selected':''}>مرتجع لتاجر — ترجع القطعة للتاجر اللي اشتريتها منه</option>
+          </select>
+        </div>
+        ${!isMelt? `
+        <div class="field" style="margin:0;">
+          <label>التاجر</label>
+          <select onchange="prb.merchantId=this.value;render();">
+            <option value="">اختار التاجر</option>
+            ${state.merchants.map(m=>`<option value="${m.id}" ${suggestedMerchant===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}
+          </select>
+        </div>`:''}
+      </div>
+      <p class="hint" style="margin-top:8px;">${isMelt
+        ? 'كل قطعة هتترجع بوزنها لمخزون الكسر بنفس عيارها، والقطعة تخرج من مخزون المحل. لو كانت القطعة مشتراة بأجر من تاجر، الأجر ده بيتسجل كخسارة (مش بيترد نقدًا).'
+        : 'كل قطعة هترجع وزنها لرصيد التاجر (يبقى ليه علينا وزن أكتر)، وتخرج من مخزون المحل ومن مخزون الخزينة.'}</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="field" style="margin:0;">
+        <label>امسح باركود القطعة هنا</label>
+        <input id="prb-scan" placeholder="امسح الباركود أو اكتب رقم القطعة واضغط Enter..."
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addPrbPieceByScan();}">
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${prb.items.length}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي الوزن</span></div><div class="value">${totalWeight.toFixed(3)} <small>جم</small></div></div>
+      ${isMelt? `<div class="card stat neg"><div class="label"><span>إجمالي الخسارة (أجر)</span></div><div class="value">${fmtCash(totalLoss)}</div></div>`
+              : `<div class="card stat"><div class="label"><span>هيترجع لرصيد التاجر</span></div><div class="value">${totalWeight.toFixed(3)} <small>جم</small></div></div>`}
+    </div>
+
+    <div class="tbl-wrap" style="margin-bottom:16px;">
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:60px;">م</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th style="width:70px;">العيار</th>
+          <th class="right" style="width:100px;">الوزن</th>
+          ${isMelt? `<th class="right" style="width:120px;">الخسارة (أجر)</th>`:''}
+          <th style="width:50px;"></th>
+        </tr></thead>
+        <tbody>
+          ${prb.items.length? prb.items.map((it,idx)=>`
+            <tr>
+              <td class="mono muted">${idx+1}</td>
+              <td class="mono" style="font-size:12px;">${esc(it.barcodeValue||'—')}</td>
+              <td class="mono">${esc(it.code)}</td>
+              <td>${esc(it.itemName)}</td>
+              <td class="muted">عيار ${it.karat}</td>
+              <td class="right num">${it.weight.toFixed(3)} جم</td>
+              ${isMelt? `<td class="right num" style="color:${it.making>0?'var(--red)':'var(--muted-2)'};">${fmtCash(it.making||0)}</td>`:''}
+              <td><span class="rm" style="display:inline-block;" onclick="removePrbLine('${it.pieceId}')">✕</span></td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="${isMelt?7:6}">امسح باركود القطعة الأولى</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+
+    <button class="btn btn-gold" style="width:100%;" onclick="submitPieceReturn()">تنفيذ المرتجع</button>
+  `;
+}
+function submitPieceReturn(){
+  if(!prb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
+  if(prb.mode==='merchant' && !prb.merchantId){ toast('اختار التاجر الأول'); return; }
+  const items = prb.items.slice();
+  const isMelt = prb.mode==='melt';
+  const merchantId = prb.merchantId;
+  mutate(()=>{
+    const m = isMelt? null : merchantById(merchantId);
+    items.forEach(it=>{
+      const pc = state.pieces.find(x=>x.id===it.pieceId);
+      if(!pc) return;
+      if(isMelt){
+        state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) + it.weight;
+        state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) - it.weight;
+        if(it.making>0.0005){
+          state.goldLosses.push({id:uid('loss'), date:todayStr(), createdAt:new Date().toISOString(),
+            pieceId:it.pieceId, code:it.code, itemName:it.itemName, karat:it.karat, weight:it.weight,
+            amount:it.making, reason:'تكسير قطعة'});
+        }
+        pc.returned = true; pc.returnedKind='melt'; pc.returnedDate=todayStr();
+      } else {
+        state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) - it.weight;
+        m.balanceGold[it.karat] = (m.balanceGold[it.karat]||0) + it.weight;
+        pc.returned = true; pc.returnedKind='merchant'; pc.returnedDate=todayStr(); pc.returnedToMerchantId=merchantId;
+      }
+      pc.sold = true; // تخرج من مخزون القطع المتاحة للبيع
+    });
+  }, isMelt? ('تم تكسير '+items.length+' قطعة ورجعت للكسر') : ('تم إرجاع '+items.length+' قطعة للتاجر'));
+  prb = null;
+  goto('pieces');
+}
+
+
 function renderPieceLookup(){
   const p = uiState.lookupPieceId? state.pieces.find(x=>x.id===uiState.lookupPieceId) : null;
   const notFound = uiState.lookupNotFound;
@@ -7589,7 +7763,7 @@ function renderPieceLookup(){
           <div style="text-align:center;">
             <div style="background:#fff;padding:8px;border-radius:8px;display:inline-block;">${qrSVG(pieceQRPayload(p),{scale:3,quiet:2})}</div>
             <div class="mono muted" style="font-size:11px;margin-top:4px;">${esc(p.uid||'')}</div>
-            <div class="pill ${sold?'pill-red':'pill-green'}" style="font-size:15px;padding:8px 20px;margin-top:8px;">${sold? 'مباعة' : 'في الاستوك'}</div>
+            <div class="pill ${p.returned?'pill-muted':(sold?'pill-red':'pill-green')}" style="font-size:15px;padding:8px 20px;margin-top:8px;">${p.returned?(p.returnedKind==='melt'?'اتكسّرت (رجعت كسر)':'اترجعت لتاجر'):(sold? 'مباعة' : 'في الاستوك')}</div>
             ${sold? `<div class="muted" style="font-size:12px;margin-top:8px;">اتباعت لـ ${esc(buyer)}<br>${fmtDateRep(p.soldDate||'')}</div>`:''}
             <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
               <button class="btn btn-sm btn-gold" onclick="printPieceQRs(['${p.id}'])">🖶 طباعة الكيو آر (A4)</button>
