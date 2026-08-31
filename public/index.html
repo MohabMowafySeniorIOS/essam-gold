@@ -1628,7 +1628,10 @@ function renderScrap(){
   return `
     <div class="pagehead">
       <div><h1>شراء الدهب الكسر بالعيار</h1><p>شراء دهب كسر من العملاء مباشرة وإضافته لمخزون الخزينة</p></div>
-      <button class="btn btn-gold" onclick="openScrapModal()">+ عملية شراء جديدة</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="openScrapRecodeModal()">🔨 تكويد رصيد الكسر</button>
+        <button class="btn btn-gold" onclick="openScrapModal()">+ عملية شراء جديدة</button>
+      </div>
     </div>
 
     <div class="section-title" style="margin-top:0;">سعر جرام الذهب المحدد من System Code<div class="line"></div></div>
@@ -7088,7 +7091,10 @@ function renderManufacture(){
   return `
     <div class="pagehead">
       <div><h1>التصنيع</h1><p>تصنيع قطع جاهزة من مخزون الذهب الكسر — الوزن بيتخصم من الكسر والقطعة بتتولّدلها باركود وتدخل قطع المحل</p></div>
-      <button class="btn btn-gold" onclick="openManufactureBuilder()" ${canMake?'':'disabled'}>+ فاتورة تصنيع</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="openScrapRecodeModal()">🔨 تكويد سريع (Popup)</button>
+        <button class="btn btn-gold" onclick="openManufactureBuilder()" ${canMake?'':'disabled'}>+ فاتورة تصنيع</button>
+      </div>
     </div>
 
     <div class="section-title" style="margin-top:0;">مخزون الذهب الكسر المتاح للتصنيع<div class="line"></div></div>
@@ -7140,6 +7146,7 @@ function renderManufacture(){
 }
 /* ============================= فاتورة تصنيع (بنفس فكرة فاتورة المشتريات) ============================= */
 let mfb = null;
+let mfbModalMode = false;
 function resetManufactureBuilder(){
   mfb = { karat: BASE_KARAT, employee:'', items: [], search:'', classFilter:'' };
 }
@@ -7148,6 +7155,28 @@ function openManufactureBuilder(){
   if(!mfb) resetManufactureBuilder();
   goto('manufacture-builder');
 }
+function openScrapRecodeModal(){
+  if(!state.products.length){ toast('اعمل كود في الكتالوج الأول'); return; }
+  if(!mfb) resetManufactureBuilder();
+  mfbModalMode = true;
+  refreshMfbModal();
+}
+function closeMfbModal(){ mfbModalMode = false; closeModal(); }
+function refreshMfbModal(){
+  if(!mfbModalMode) return;
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closeMfbModal()">
+      <div class="modal" style="max-width:920px;max-height:88vh;overflow:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <h2 style="margin:0;">🔨 تكويد رصيد الكسر</h2>
+          <button class="btn btn-sm btn-ghost" onclick="closeMfbModal()">✕ إغلاق</button>
+        </div>
+        <p class="hint" style="margin-top:2px;">اختار كل صنف كان جزء من الكسر ده وزنه لوحده، وكل واحد هياخد كود فريد وكيو آر خاص بيه ويرجع لرصيد المحل تاني</p>
+        ${mfbCoreHTML(true)}
+      </div>
+    </div>`;
+}
 function mfbTotals(){
   const scrapW = mfb.items.reduce((s,i)=>s+(Number(i.scrapWeight)||0),0);
   const pieceW = mfb.items.reduce((s,i)=>s+(Number(i.pieceWeight)||0),0);
@@ -7155,20 +7184,23 @@ function mfbTotals(){
 }
 function renderManufactureBuilder(){
   if(!mfb) resetManufactureBuilder();
-  const t = mfbTotals();
-  const avail = scrapStockOf(mfb.karat);
-  const over = t.scrapW > avail + 0.0005;
   return `
     <div class="pagehead">
       <div><h1>فاتورة تصنيع</h1>
         <p>اختار الكود، اكتب وزن القطعة واضغط Enter — القطعة بتنزل في الفاتورة، ولما تحفظ كل القطع بتتصنّع مرة واحدة وكل واحدة بتاخد كود فريد وكيو آر خاص بيها</p></div>
       ${navBtn('manufacture','← رجوع لعمليات التصنيع')}
     </div>
-
+    ${mfbCoreHTML(false)}`;
+}
+function mfbCoreHTML(inModal){
+  const t = mfbTotals();
+  const avail = scrapStockOf(mfb.karat);
+  const over = t.scrapW > avail + 0.0005;
+  return `
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>عيار الكسر المستخدم</label>
-          <select onchange="mfb.karat=parseFloat(this.value);render();">
+          <select onchange="mfb.karat=parseFloat(this.value);${inModal?'refreshMfbModal();':'render();'}">
             ${state.karats.map(k=>`<option value="${k}" ${mfb.karat===k?'selected':''}>عيار ${k} — متاح ${fmtW(scrapStockOf(k))}</option>`).join('')}
           </select>
         </div>
@@ -7186,7 +7218,7 @@ function renderManufactureBuilder(){
 
     <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;">
       <div>
-        <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
+        <div class="section-title" style="margin-top:0;">القطع المضافة${inModal?'':' في الفاتورة'}<div class="line"></div></div>
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
             <thead><tr><th style="width:45px;">م</th><th>التصنيف</th><th>الكود</th><th>الصنف</th>
@@ -7200,10 +7232,10 @@ function renderManufactureBuilder(){
                   <td class="mono">${esc(it.code)}</td>
                   <td>${esc(it.itemName)}</td>
                   <td><input type="number" step="0.001" value="${Number(it.pieceWeight).toFixed(3)}" style="padding:5px 7px;font-size:12.5px;"
-                       onchange="setMfbWeight(${idx},'pieceWeight',this.value)"></td>
+                       onchange="setMfbWeight(${idx},'pieceWeight',this.value,${inModal})"></td>
                   <td class="right num muted">${fmtW(Math.max(0,it.scrapWeight-it.pieceWeight))}</td>
-                  <td><span class="rm" style="display:inline-block;" onclick="removeMfbItem(${idx})">✕</span></td>
-                </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لسه مفيش قطع في فاتورة التصنيع</td></tr>`}
+                  <td><span class="rm" style="display:inline-block;" onclick="removeMfbItem(${idx},${inModal})">✕</span></td>
+                </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لسه مفيش قطع مضافة</td></tr>`}
             </tbody>
             ${mfb.items.length? `<tfoot><tr>
               <td colspan="4">الإجمالي</td>
@@ -7215,7 +7247,7 @@ function renderManufactureBuilder(){
         </div>
 
         ${over? `<div class="card" style="margin-bottom:12px;border-color:var(--red);color:var(--red);font-size:13px;">
-          تنبيه: إجمالي وزن الكسر في الفاتورة (${fmtW(t.scrapW)}) أكبر من المتاح لعيار ${mfb.karat} (${fmtW(avail)}) — هيتحفظ عادي ومخزون الكسر هيبقى بالسالب (${fmtW(avail - t.scrapW)})
+          تنبيه: إجمالي وزن الكسر (${fmtW(t.scrapW)}) أكبر من المتاح لعيار ${mfb.karat} (${fmtW(avail)}) — هيتحفظ عادي ومخزون الكسر هيبقى بالسالب (${fmtW(avail - t.scrapW)})
         </div>`:''}
 
         <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
@@ -7226,10 +7258,10 @@ function renderManufactureBuilder(){
 
         <div class="row">
           <div class="field" style="display:flex;align-items:flex-end;">
-            <button class="btn btn-ghost" style="width:100%;" onclick="discardMfb()">إلغاء الفاتورة</button>
+            <button class="btn btn-ghost" style="width:100%;" onclick="${inModal? 'closeMfbModal()':'discardMfb()'}">${inModal?'إغلاق من غير حفظ':'إلغاء الفاتورة'}</button>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;">
-            <button class="btn btn-gold" style="width:100%;" onclick="submitManufactureBuilder()">تنفيذ التصنيع وحفظ الفاتورة</button>
+            <button class="btn btn-gold" style="width:100%;" onclick="submitManufactureBuilder(${inModal})">${inModal?'تنفيذ التكويد':'تنفيذ التصنيع وحفظ الفاتورة'}</button>
           </div>
         </div>
       </div>
@@ -7238,26 +7270,26 @@ function renderManufactureBuilder(){
         <div class="section-title" style="margin-top:0;">إضافة قطعة<div class="line"></div></div>
         <div class="card" style="margin-bottom:14px;" data-enter-scope>
           <div class="field"><label>الكود (الصنف / التصنيف / الفئة السعرية)</label>
-            <select id="mfb-product">${state.products.map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(productLabel(x))}</option>`).join('')}</select>
+            <select id="${inModal?'mfbm':'mfb'}-product">${state.products.map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(productLabel(x))}</option>`).join('')}</select>
           </div>
           <div class="field"><label>وزن القطعة الناتجة (جم)</label>
-              <input type="number" step="0.001" id="mfb-weight" placeholder="0.000" oninput="mfbPreview()"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();addMfbItem();}"></div>
-          <div class="field"><label>الفاقد (بيتحسب تلقائي)</label><input id="mfb-waste" readonly value="0.000"></div>
-          <button class="btn btn-gold" style="width:100%;" onclick="addMfbItem()">+ إضافة القطعة للفاتورة</button>
+              <input type="number" step="0.001" id="${inModal?'mfbm':'mfb'}-weight" placeholder="0.000"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addMfbItem(${inModal});}"></div>
+          <button class="btn btn-gold" style="width:100%;" onclick="addMfbItem(${inModal})">+ إضافة القطعة</button>
         </div>
         <div class="card" style="font-size:12.5px;color:var(--muted);line-height:1.7;">
-          تقدر تضيف أكتر من قطعة في نفس الفاتورة، وتعدّل الأوزان من الجدول على الشمال قبل ما تحفظ.
+          تقدر تضيف أكتر من قطعة، وتعدّل الأوزان من الجدول على الشمال قبل ما تنفّذ.
         </div>
       </div>
     </div>`;
 }
-function mfbPreview(){
-  const el=document.getElementById('mfb-waste'); if(el) el.value='0.000';
+function mfbAfterChange(inModal){
+  if(inModal) refreshMfbModal(); else render();
 }
-function addMfbItem(){
-  const pid = document.getElementById('mfb-product').value;
-  const pieceWeight = parseFloat(document.getElementById('mfb-weight').value)||0;
+function addMfbItem(inModal){
+  const prefix = inModal? 'mfbm':'mfb';
+  const pid = document.getElementById(prefix+'-product').value;
+  const pieceWeight = parseFloat(document.getElementById(prefix+'-weight').value)||0;
   const scrapWeight = pieceWeight;
   if(pieceWeight<=0){ toast('اكتب وزن القطعة الناتجة'); return; }
   const prod = state.products.find(x=>x.id===pid);
@@ -7268,21 +7300,20 @@ function addMfbItem(){
     itemTypeId: prod.itemTypeId, priceCategoryId: prod.priceCategoryId,
     scrapWeight, pieceWeight });
   saveMfbDraft();
-  refocusAfterRender('mfb-weight');
-  render();
-  const e=document.getElementById('mfb-weight'); if(e) e.value='';
-  const wv=document.getElementById('mfb-waste'); if(wv) wv.value='0.000';
+  if(!inModal) refocusAfterRender(prefix+'-weight');
+  mfbAfterChange(inModal);
+  if(inModal){ const e=document.getElementById(prefix+'-weight'); if(e){ e.value=''; e.focus(); } }
 }
-function setMfbWeight(idx, field, val){
+function setMfbWeight(idx, field, val, inModal){
   const it = mfb.items[idx];
   if(!it) return;
   const v = parseFloat(val)||0;
-  if(v<=0){ toast('الوزن لازم يكون أكبر من صفر'); render(); return; }
+  if(v<=0){ toast('الوزن لازم يكون أكبر من صفر'); mfbAfterChange(inModal); return; }
   it.pieceWeight = v;
   it.scrapWeight = v;
-  saveMfbDraft(); render();
+  saveMfbDraft(); mfbAfterChange(inModal);
 }
-function removeMfbItem(idx){ mfb.items.splice(idx,1); saveMfbDraft(); render(); }
+function removeMfbItem(idx, inModal){ mfb.items.splice(idx,1); saveMfbDraft(); mfbAfterChange(inModal); }
 function saveMfbDraft(){
   state.drafts = state.drafts || {};
   state.drafts.manufacture = mfb? JSON.parse(JSON.stringify(mfb)) : null;
@@ -7294,13 +7325,12 @@ function discardMfb(){
     resetManufactureBuilder(); saveMfbDraft(); closeModal(); goto('manufacture');
   }, {confirmLabel:'إلغاء الفاتورة'});
 }
-function submitManufactureBuilder(){
+function submitManufactureBuilder(inModal){
   if(!mfb.items.length){ toast('ضيف قطعة واحدة على الأقل'); return; }
   const empEl = document.getElementById('mfb-emp');
   const employee = (empEl? empEl.value : (mfb.employee||'')).trim();
   if(!employee){ toast('اكتب اسم الموظف الأول'); if(empEl){ empEl.style.borderColor='var(--red)'; empEl.focus(); } return; }
   const karat = mfb.karat;
-  const t = mfbTotals();
   const items = mfb.items.slice();
   const madePieces = [];
   mutate(()=>{
@@ -7324,83 +7354,13 @@ function submitManufactureBuilder(){
     state.employees = state.employees||[]; if(!state.employees.includes(employee)) state.employees.push(employee);
   }, 'اتصنّعت '+items.length+' قطعة وضافت للمخزن');
   resetManufactureBuilder(); saveMfbDraft();
-  goto('manufacture');
+  if(inModal){ mfbModalMode = false; closeModal(); } else { goto('manufacture'); }
   if(madePieces.length) setTimeout(()=>showPieceQRModal(madePieces), 150);
 }
 
-function openManufactureModal(){
-  if(!state.products.length){ toast('اعمل كود في الكتالوج الأول'); return; }
-  const root=document.getElementById('modal-root');
-  root.innerHTML = `
-    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-      <div class="modal">
-        <h2>عملية تصنيع من الذهب الكسر</h2>
-        <div class="hint">اختار العيار والوزن اللي هيتاخد من الكسر، والكود اللي هيتحدد بيه صنف وتصنيف القطعة الناتجة. القطعة هتاخد باركود تصنيع خاص بيها.</div>
-        <div class="row">
-          <div class="field"><label>العيار</label>
-            <select id="mf-karat" onchange="recalcMfg()">${state.karats.map(k=>`<option value="${k}" ${k===BASE_KARAT?'selected':''}>عيار ${k} — متاح ${fmtW(scrapStockOf(k))}</option>`).join('')}</select>
-          </div>
-          <div class="field"><label>وزن الكسر المستخدم (جم)</label><input type="number" step="0.001" id="mf-scrap" placeholder="0.000" oninput="recalcMfg()"></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>وزن القطعة الناتجة (جم)</label><input type="number" step="0.001" id="mf-weight" placeholder="0.000" oninput="recalcMfg()"></div>
-          <div class="field"><label>الفاقد (بيتحسب تلقائي)</label><input id="mf-waste" readonly value="0.000"></div>
-        </div>
-        <div class="field"><label>الكود (الصنف / التصنيف / الفئة السعرية)</label>
-          <select id="mf-product">${state.products.map(p=>`<option value="${p.id}">${esc(p.code)} — ${esc(productLabel(p))}</option>`).join('')}</select>
-        </div>
-        <div class="field"><label>اسم الموظف</label>
-          <input id="mf-emp" list="mf-emp-list" placeholder="اسم الموظف">
-          <datalist id="mf-emp-list">${(state.employees||[]).map(e=>`<option value="${esc(e)}"></option>`).join('')}</datalist>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
-          <button class="btn btn-gold" onclick="submitManufacture()">تنفيذ التصنيع</button>
-        </div>
-      </div>
-    </div>`;
-  const el=document.getElementById('mf-scrap'); if(el) el.focus();
-}
-function recalcMfg(){
-  const s=parseFloat(document.getElementById('mf-scrap').value)||0;
-  const w=parseFloat(document.getElementById('mf-weight').value)||0;
-  document.getElementById('mf-waste').value=(Math.max(0,s-w)).toFixed(3);
-}
 function classificationBarcode(cid){
   const c = state.classifications.find(x=>x.id===cid);
   return c && c.barcode? c.barcode : '00';
-}
-function submitManufacture(){
-  const karat = parseFloat(document.getElementById('mf-karat').value);
-  const scrapW = parseFloat(document.getElementById('mf-scrap').value)||0;
-  const pieceW = parseFloat(document.getElementById('mf-weight').value)||0;
-  const productId = document.getElementById('mf-product').value;
-  const employee = document.getElementById('mf-emp').value.trim();
-  if(scrapW<=0){ toast('أدخل وزن الكسر المستخدم'); return; }
-  if(pieceW<=0){ toast('أدخل وزن القطعة الناتجة'); return; }
-  if(pieceW>scrapW){ toast('وزن القطعة مينفعش يكون أكبر من وزن الكسر المستخدم'); return; }
-  if(scrapW > scrapStockOf(karat)+0.0005){ toast('مخزون الكسر لعيار '+karat+' مش كفاية (المتاح '+fmtW(scrapStockOf(karat))+')'); return; }
-  const product = state.products.find(p=>p.id===productId);
-  const it = product? state.itemTypes.find(x=>x.id===product.itemTypeId) : null;
-  mutate(()=>{
-    const waste = scrapW - pieceW;
-    state.scrapStock[karat] = scrapStockOf(karat) - scrapW;
-    if(waste>0) state.treasury.gold[karat] = (state.treasury.gold[karat]||0) - waste;
-    const serial = state.counters.mfgPiece++;
-    const clsBc = classificationBarcode(product? product.classificationId : null);
-    const barcodeValue = 'M'+clsBc+'-'+String(serial);
-    const pieceId = uid('pc');
-    state.pieces.push({id:pieceId, uid:newPieceUid(), no:serial, date:todayStr(), origin:'manufacture', invoiceId:null, merchantId:null,
-      productId: product? product.id : null, itemTypeId: product? product.itemTypeId : null,
-      classificationId: product? product.classificationId : null, priceCategoryId: product? product.priceCategoryId : null,
-      karat, weight:pieceW, barcodeValue});
-    state.manufactures.push({id:uid('mfg'), no:state.counters.mfg++, date:todayStr(), createdAt:new Date().toISOString(),
-      karat, scrapWeight:scrapW, pieceWeight:pieceW, waste, productId: product? product.id:null,
-      itemName: it? it.name : '—', classificationId: product? product.classificationId : null,
-      pieceId, barcodeValue, employee});
-    if(employee){ state.employees = state.employees||[]; if(!state.employees.includes(employee)) state.employees.push(employee); }
-  }, 'تم تصنيع القطعة وإضافتها للمخزن بباركود التصنيع');
-  closeModal();
 }
 function deleteManufacture(id){
   const m = state.manufactures.find(x=>x.id===id);
