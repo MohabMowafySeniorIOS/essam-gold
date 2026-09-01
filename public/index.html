@@ -336,6 +336,9 @@
     border-right:4px solid var(--navy);border-radius:10px;padding:16px 14px;text-decoration:none;
     color:var(--text);box-shadow:0 1px 3px rgba(16,44,77,.07);transition:.15s;}
   .sc-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,44,77,.14);border-right-color:var(--gold-bright);}
+  .sc-jiggle{animation:sc-jiggle-kf .28s ease-in-out infinite;cursor:pointer;}
+  .sc-jiggle:nth-child(even){animation-delay:.07s;}
+  @keyframes sc-jiggle-kf{0%{transform:rotate(-1deg);}50%{transform:rotate(1deg);}100%{transform:rotate(-1deg);}}
   .sc-ic{font-size:22px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
     background:#eef2f7;border-radius:9px;flex:none;}
   .sc-lbl{font-weight:700;font-size:13.5px;}
@@ -1026,6 +1029,7 @@ const NAV = [
     {id:'pieces', label:'باركود القطع', icon:'▥'},
     {id:'piece-lookup', label:'اسكان قطعة / تحركاتها', icon:'🔍'},
     {id:'piece-return', label:'مرتجع قطع ذهب', icon:'↩'},
+    {id:'scrap-ledger', label:'الكسر', icon:'⛃'},
   ]},
   {group:'التجار', items:[
     {id:'merchants', label:'التجار وأكوادهم', icon:'⌘'},
@@ -1226,6 +1230,7 @@ function render(){
     pieces: renderPieces,
     'piece-lookup': renderPieceLookup,
     'piece-return': renderPieceReturn,
+    'scrap-ledger': renderScrapLedger,
     merchants: renderMerchants,
     'merchant-summary': renderMerchantSummary,
     'merchant-statement': renderMerchantStatement,
@@ -1623,6 +1628,79 @@ function submitCashMove(dir){
     state.cashMoves.push({id:uid('cm'), date:todayStr(), dir, amount:amt, note});
   }, dir==='in'?'تم إيداع المبلغ':'تم سحب المبلغ');
   closeModal();
+}
+
+/* ============================= الكسر: رصيد كل عيار + حركة يومية ============================= */
+function scrapDailyMovement(){
+  const days = {};
+  function add(date, karat, delta){
+    const d = String(date||todayStr()).slice(0,10);
+    days[d] = days[d] || {};
+    days[d][karat] = (days[d][karat]||0) + delta;
+  }
+  state.scrapPurchases.forEach(sp=> add(sp.date, sp.karat, Number(sp.weight)||0));
+  state.pieces.filter(p=>p.returned && p.returnedKind==='melt').forEach(p=> add(p.returnedDate, p.karat, Number(p.weight)||0));
+  state.manufactures.forEach(m=> add(m.date, m.karat, -(Number(m.scrapWeight)||0)));
+  return days;
+}
+function renderScrapLedger(){
+  const karats = [...state.karats].sort((a,b)=>b-a);
+  const movement = scrapDailyMovement();
+  const dates = Object.keys(movement).sort(); // تصاعدي عشان نحسب الرصيد التراكمي صح
+  const running = {}; karats.forEach(k=> running[k]=0);
+  const rows = dates.map(d=>{
+    karats.forEach(k=> running[k] += (movement[d][k]||0));
+    return { date:d, day:{...movement[d]}, cum:{...running} };
+  }).reverse(); // أحدث يوم فوق
+
+  const currentTotal21 = karats.reduce((s,k)=> s+to21(scrapStockOf(k),k), 0);
+
+  return `
+    <div class="pagehead">
+      <div><h1>الكسر</h1><p>رصيد الذهب الكسر الحالي لكل عيار لوحده، وحركة كل يوم، وإجمالي تراكمي على مدار الأيام</p></div>
+      <button class="btn" onclick="printReportEl('scrap-ledger-table','الكسر')">🖶 طباعة</button>
+    </div>
+
+    <div class="section-title" style="margin-top:0;">الرصيد الحالي لكل عيار<div class="line"></div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:10px;">
+      ${karats.map(k=>`
+        <div class="card stat"><div class="label"><span>عيار ${k}</span></div>
+          <div class="value" style="font-size:19px;color:${scrapStockOf(k)<0?'var(--red)':'var(--navy)'};">${fmtW(scrapStockOf(k))}</div></div>
+      `).join('')}
+      <div class="card stat pos"><div class="label"><span>الإجمالي (ع${BASE_KARAT})</span></div>
+        <div class="value" style="font-size:19px;">${currentTotal21.toFixed(3)} <small>جم</small></div></div>
+    </div>
+
+    <div class="section-title">الحركة اليومية (وارد شراء كسر + تكسير قطع، منصرف تصنيع/تكويد)<div class="line"></div></div>
+    <div class="tbl-wrap" id="scrap-ledger-table">
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:110px;">التاريخ</th>
+          ${karats.map(k=>`<th class="right" colspan="2">عيار ${k}</th>`).join('')}
+          <th class="right total-col" style="width:110px;">صافي اليوم (ع${BASE_KARAT})</th>
+        </tr>
+        <tr>
+          <th></th>
+          ${karats.map(()=>`<th class="right muted" style="font-size:10.5px;">حركة اليوم</th><th class="right muted" style="font-size:10.5px;">الرصيد التراكمي</th>`).join('')}
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${rows.length? rows.map(r=>{
+            const netToday21 = karats.reduce((s,k)=> s+to21(r.day[k]||0,k), 0);
+            return `<tr>
+              <td class="muted num">${fmtDateRep(r.date)}</td>
+              ${karats.map(k=>{
+                const dv = r.day[k]||0;
+                return `<td class="right num" style="color:${dv>0?'var(--green)':dv<0?'var(--red)':'var(--muted-2)'};">${dv? (dv>0?'+':'')+fmtW(dv) : '—'}</td>
+                        <td class="right num muted">${fmtW(r.cum[k])}</td>`;
+              }).join('')}
+              <td class="right total-col num" style="font-weight:700;color:${netToday21>=0?'var(--green)':'var(--red)'};">${netToday21>=0?'+':''}${netToday21.toFixed(3)} جم</td>
+            </tr>`;
+          }).join('') : `<tr class="empty-row"><td colspan="${karats.length*2+2}">لسه مفيش حركة كسر متسجلة</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 /* ============================= شراء دهب كسر بالعيار ============================= */
@@ -2398,8 +2476,8 @@ function clearThermalPageStyle(){
   const s = document.getElementById('thermal-page-style');
   if(s) s.textContent = '';
 }
-function printPiecesThermalQR(ids){
-  const pieces = (ids||[]).map(id=> state.pieces.find(x=>x.id===id)).filter(Boolean);
+function printPiecesThermalQR(idsOrPieces){
+  const pieces = resolvePiecesArg(idsOrPieces);
   if(!pieces.length){ toast('اختار قطعة واحدة على الأقل'); return; }
   const {w,h} = thermalLabelSize();
   let area = document.getElementById('print-area');
@@ -2650,8 +2728,12 @@ function pieceQRLabelHTML(p){
     </div>
   </div>`;
 }
-function printPieceQRs(ids){
-  const pieces = (ids||[]).map(id=> state.pieces.find(x=>x.id===id)).filter(Boolean);
+/* بتاخد إما مصفوفة ids (قطع محفوظة) أو مصفوفة كائنات قطعة جاهزة (زي عناصر فاتورة لسه مسودة) */
+function resolvePiecesArg(idsOrPieces){
+  return (idsOrPieces||[]).map(x=> (typeof x==='string')? state.pieces.find(p=>p.id===x) : x).filter(Boolean);
+}
+function printPieceQRs(idsOrPieces){
+  const pieces = resolvePiecesArg(idsOrPieces);
   if(!pieces.length){ toast('اختار قطعة واحدة على الأقل'); return; }
   let area = document.getElementById('print-area');
   if(!area){ area = document.createElement('div'); area.id='print-area'; document.body.appendChild(area); }
@@ -2659,7 +2741,7 @@ function printPieceQRs(ids){
   document.body.classList.add('print-barcodes');
   setTimeout(()=>{ window.print(); setTimeout(()=>document.body.classList.remove('print-barcodes'), 500); }, 80);
 }
-function showPieceQRModal(ids){
+function showPieceQRModal(idsOrPieces){
   const pieces = (ids||[]).map(id=> state.pieces.find(x=>x.id===id)).filter(Boolean);
   if(!pieces.length){ toast('اختار قطعة واحدة على الأقل'); return; }
   const root=document.getElementById('modal-root');
@@ -2673,8 +2755,8 @@ function showPieceQRModal(ids){
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>
-          <button class="btn btn-ghost" onclick='printPiecesThermalQR(${JSON.stringify(pieces.map(p=>p.id))})'>🖶 طباعة على الحرارية (Zebra)</button>
-          <button class="btn btn-gold" onclick='printPieceQRs(${JSON.stringify(pieces.map(p=>p.id))})'>🖶 طباعة (A4)</button>
+          <button class="btn btn-ghost" onclick='printPiecesThermalQR(${JSON.stringify(pieces)})'>🖶 طباعة على الحرارية (Zebra)</button>
+          <button class="btn btn-gold" onclick='printPieceQRs(${JSON.stringify(pieces)})'>🖶 طباعة (A4)</button>
         </div>
       </div>
     </div>`;
@@ -3505,8 +3587,10 @@ function renderPurchaseBuilder(){
         <div class="row">
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
           <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
-            ${pbEditId? `<button class="btn btn-ghost" onclick="printInvoicePieceQRs('${pbEditId}')" type="button">🖶 طباعة QR القطع</button>` : ''}
-            ${pbEditId? `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="discardPurchaseEdit()" type="button">🗑 حذف الفاتورة</button>` : ''}
+            ${pbEditId? `<button class="btn btn-ghost" onclick="printInvoicePieceQRs('${pbEditId}')" type="button">🖶 طباعة QR القطع</button>`
+                      : `<button class="btn btn-ghost" onclick="printPBItemsQR()" type="button">🖶 طباعة QR القطع</button>`}
+            ${pbEditId? `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="discardPurchaseEdit()" type="button">🗑 حذف الفاتورة</button>`
+                      : `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="cancelPurchaseBuilder()" type="button">🗑 حذف الفاتورة</button>`}
             <button class="btn btn-gold" style="width:100%;" onclick="submitPurchaseBuilderInvoice()">حفظ الفاتورة</button>
           </div>
         </div>
@@ -3656,6 +3740,19 @@ function addPBNewCode(){
   if(wEl) wEl.focus();
 }
 
+function printPBItemsQR(){
+  if(!pb.items.length){ toast('لسه مفيش قطع مضافة'); return; }
+  showPieceQRModal(pb.items);
+}
+function cancelPurchaseBuilder(){
+  if(!pb.items.length){ pb=null; goto('purchases'); return; }
+  showConfirmModal('إلغاء الفاتورة دي وكل القطع اللي ضفتها؟ مفيش حاجة اتسجلت في الحسابات لحد دلوقتي، فمفيش خسارة أي رصيد.', ()=>{
+    pb = null;
+    closeModal();
+    goto('purchases');
+    toast('اتلغت الفاتورة');
+  }, {confirmLabel:'إلغاء الفاتورة'});
+}
 function addPBLine(){
   const product = pb.selectedProductId? state.products.find(p=>p.id===pb.selectedProductId) : null;
   if(!product){ toast('اختر كودًا من الكتالوج أولاً'); return; }
@@ -3674,7 +3771,7 @@ function addPBLine(){
     itemTypeId: product.itemTypeId, classificationId: product.classificationId, priceCategoryId: product.priceCategoryId,
     price, making: weight*price,
     weight, karat: pb.karat, lineTotal: weight*price,
-    serial, barcodeValue
+    serial, barcodeValue, uid: newPieceUid()
   });
   weightInput.value='';
   render();
@@ -3851,7 +3948,7 @@ function submitPurchaseBuilderInvoice(){
 
     items.forEach((it,i)=>{
       const pieceId = pieceIds[i];
-      state.pieces.push({id:pieceId, uid:newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
+      state.pieces.push({id:pieceId, uid:it.uid||newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
       generatedPieceIds.push(pieceId);
     });
     state.counters.piece = finalSerialCursor;
@@ -8167,27 +8264,40 @@ function showAddShortcutModal(){
       </div>
     </div>`;
 }
+let scEditMode = false;
+let scPressTimer = null;
+function scPressStart(){
+  clearTimeout(scPressTimer);
+  scPressTimer = setTimeout(()=>{ if(!scEditMode){ scEditMode = true; render(); } }, 500);
+}
+function scPressEnd(){ clearTimeout(scPressTimer); }
+function scExitEditMode(){ scEditMode = false; render(); }
 function renderHomeShortcuts(){
   const list = homeShortcuts();
   return `
     <div class="section-title" style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
       <span>البنود الأكثر استخدامًا<div class="line"></div></span>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-sm btn-gold" onclick="showAddShortcutModal()" type="button">➕ أضف اختصار</button>
+        ${scEditMode? `<button class="btn btn-sm btn-gold" onclick="scExitEditMode()" type="button">✓ تم</button>` : ''}
+        <button class="btn btn-sm btn-ghost" onclick="showAddShortcutModal()" type="button">➕ أضف اختصار</button>
         <button class="btn btn-sm btn-ghost" onclick="resetHomeShortcuts()" type="button">↺ رجوع للافتراضي</button>
       </div>
     </div>
-    <div class="sc-grid">
+    <div class="sc-grid" onclick="if(scEditMode) scExitEditMode();">
       ${list.map(s=>`
-        <a class="sc-card" href="${viewHref(s.view)}" onclick="return navClick(event,'${s.view}')" style="position:relative;">
-          <span class="sc-rm" title="إزالة الاختصار" onclick="event.preventDefault();event.stopPropagation();removeHomeShortcut('${s.view}')"
+        <a class="sc-card${scEditMode?' sc-jiggle':''}" href="${viewHref(s.view)}"
+          onclick="${scEditMode? 'event.preventDefault();event.stopPropagation();return false;' : `return navClick(event,'${s.view}')`}"
+          onmousedown="scPressStart()" onmouseup="scPressEnd()" onmouseleave="scPressEnd()"
+          ontouchstart="scPressStart()" ontouchend="scPressEnd()"
+          style="position:relative;">
+          ${scEditMode? `<span class="sc-rm" title="إزالة الاختصار" onclick="event.preventDefault();event.stopPropagation();removeHomeShortcut('${s.view}')"
             style="position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:#f2f2f2;color:#c0392b;
-            display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;line-height:1;">✕</span>
+            display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;line-height:1;">✕</span>` : ''}
           <span class="sc-ic">${s.icon}</span>
           <span class="sc-lbl">${esc(s.label)}</span>
         </a>`).join('')}
     </div>
-    <div class="hint" style="margin-top:14px;">كل زرار هنا لينك حقيقي — تقدر تدوس عليه كليك يمين وتختار "فتح في تاب جديد". دوس على الدائرة الحمرا في ركن أي اختصار عشان تشيله.</div>
+    <div class="hint" style="margin-top:14px;">${scEditMode? 'دوس على الدائرة الحمرا عشان تشيل أي اختصار، ودوس "✓ تم" لما تخلص.' : 'دوس مطوّل (Hold) على أي اختصار عشان تظهر خانة الحذف. كل زرار هنا لينك حقيقي — تقدر تدوس عليه كليك يمين وتختار "فتح في تاب جديد".'}</div>
   `;
 }
 function renderHomeAnalytics(){
