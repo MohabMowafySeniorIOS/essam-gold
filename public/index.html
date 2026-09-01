@@ -5797,7 +5797,8 @@ function setCustomerSaleWeight(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
   let v = parseFloat(val)||0;
-  const max = Number(it.origWeight!=null? it.origWeight : it.weight)||0;
+  if(it.origWeight==null){ it.origWeight = it.weight; } // احتياط للقطع اللي اتضافت قبل ما ميزة تعديل الوزن تتفعّل
+  const max = Number(it.origWeight)||0;
   if(v<=0){ toast('الوزن لازم يكون أكبر من صفر'); render(); return; }
   if(v > max + 0.0005){ v = max; toast('الوزن مينفعش يكون أكبر من وزن القطعة المكودة ('+fmtW(max)+')'); }
   it.weight = v; recalcCsbLine(it); saveCsbDraft(); render();
@@ -6031,6 +6032,7 @@ function submitCustomerSale(){
   paid = Math.max(0, Math.min(paid, totalAll));
   const items = csb.items, customerId = csb.customerId;
   let savedId = null;
+  const remaindersByKarat = {};
   mutate(()=>{
     const c = customerById(customerId);
     items.forEach(it=>{
@@ -6040,7 +6042,11 @@ function submitCustomerSale(){
       c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) + it.weight;
       const pc = state.pieces.find(x=>x.id===it.pieceId);
       if(pc){ pc.sold=true; pc.soldDate=todayStr(); pc.soldToCustomerId=customerId; pc.soldKind='customer'; }
-      if(remainder>0.0005){ state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) + remainder; it.remainderToScrap = remainder; }
+      if(remainder>0.0005){
+        state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) + remainder;
+        it.remainderToScrap = remainder;
+        remaindersByKarat[it.karat] = (remaindersByKarat[it.karat]||0) + remainder;
+      }
     });
     state.treasury.cash += paid;
     c.balanceCash += (totalAll - paid);
@@ -6053,8 +6059,39 @@ function submitCustomerSale(){
       customerId, items:invItems, note, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
   }, 'تم حفظ فاتورة العميل');
   csb = null; saveCsbDraft();
+  const remainderKarats = Object.keys(remaindersByKarat);
+  if(remainderKarats.length){
+    promptRemainderToScrap(remaindersByKarat, savedId);
+  } else {
+    goto('customer-sales');
+    if(savedId) setTimeout(()=>showInvoiceQR('CS', savedId), 120);
+  }
+}
+function promptRemainderToScrap(remaindersByKarat, savedId){
+  const karats = Object.keys(remaindersByKarat);
+  const lines = karats.map(k=>`عيار ${k}: <b style="color:var(--gold-bright);">${fmtW(remaindersByKarat[k])}</b>`).join(' — ');
+  const root=document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-bg">
+      <div class="modal" style="max-width:420px;">
+        <h2>⚖️ فيه باقي رجع للكسر</h2>
+        <div class="hint" style="margin-bottom:10px;">الفرق بين وزن القطعة الأصلي والوزن المباع رجع لرصيد الكسر: ${lines}</div>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:14px;">عاوز تكوّد الباقي دلوقتي كقطعة جديدة جاهزة للبيع، ولا تسيبه في رصيد الكسر وتكوّده بعدين؟</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="skipRemainderRecode('${savedId}')">تخطي</button>
+          <button class="btn btn-gold" onclick="openRemainderRecode('${savedId}')">🔨 كوّد الباقي دلوقتي</button>
+        </div>
+      </div>
+    </div>`;
+}
+function skipRemainderRecode(savedId){
+  closeModal();
   goto('customer-sales');
   if(savedId) setTimeout(()=>showInvoiceQR('CS', savedId), 120);
+}
+function openRemainderRecode(savedId){
+  closeModal();
+  openScrapRecodeModal();
 }
 function deleteCustomerSale(id){
   const inv = state.customerSales.find(x=>x.id===id);
