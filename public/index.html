@@ -3495,6 +3495,7 @@ function resetPurchaseBuilder(){
     search: '',
     classFilter: '',
     selectedProductId: null,
+    discountPercent: 0,
     items: [],
     serialCursor: state.counters.piece
   };
@@ -3527,7 +3528,10 @@ function renderPurchaseBuilder(){
   const cashBal = merchant? merchant.balanceCash : 0;
   const goldBal = merchant? goldTo21(merchant.balanceGold) : 0;
   const totalWeight = pb.items.reduce((s,i)=>s+i.weight,0);
-  const totalMaking = pb.items.reduce((s,i)=>s+(i.making||0),0);
+  const totalMakingBeforeDiscount = pb.items.reduce((s,i)=>s+(i.making||0),0);
+  const discountPercent = Number(pb.discountPercent)||0;
+  const discountAmount = totalMakingBeforeDiscount * (discountPercent/100);
+  const totalMaking = totalMakingBeforeDiscount - discountAmount;
 
   return `
     <div class="pagehead">
@@ -3564,7 +3568,7 @@ function renderPurchaseBuilder(){
         <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
-            <thead><tr><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>أجر الجرام</th><th>الوزن</th><th class="right">الأجر</th><th></th></tr></thead>
+            <thead><tr><th style="width:34px;"><input type="checkbox" checked onchange="togglePBSelectAll(this.checked)" title="تحديد/إلغاء الكل"></th><th>التصنيف</th><th>الكود</th><th>الصنف</th><th>أجر الجرام</th><th>الوزن</th><th class="right">الأجر</th><th></th></tr></thead>
             <tbody id="pb-items-body">
               ${renderPBItemsRows()}
             </tbody>
@@ -3574,21 +3578,25 @@ function renderPurchaseBuilder(){
           <div class="kv-inline">
             <span class="kv-chip">عدد القطع: <b>${pb.items.length}</b></span>
             <span class="kv-chip">إجمالي الوزن: <b>${totalWeight.toFixed(3)}</b> جم</span>
-            <span class="kv-chip">إجمالي الأجر: <b>${fmtCash(totalMaking)}</b></span>
+            <span class="kv-chip">إجمالي الأجر قبل الخصم: <b>${fmtCash(totalMakingBeforeDiscount)}</b></span>
+            ${discountPercent>0? `<span class="kv-chip" style="color:var(--red);">خصم ${discountPercent}%: <b>-${fmtCash(discountAmount)}</b></span>` : ''}
+          </div>
+          <div class="field" style="margin:0;min-width:160px;">
+            <label style="margin-bottom:3px;">نسبة الخصم على الأجر (%)</label>
+            <input type="number" step="0.5" min="0" max="100" value="${discountPercent}" onchange="pb.discountPercent=Math.max(0,Math.min(100,parseFloat(this.value)||0));render();">
           </div>
         </div>
 
         <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
           عند الحفظ: <b style="color:var(--gold-bright);">${totalWeight.toFixed(3)} جم</b> عيار ${pb.karat}
           هتتقيد للتاجر في رصيد الذهب (ليه علينا)، و<b style="color:var(--gold-bright);">${fmtCash(totalMaking)}</b>
-          أجر (الوزن × أجر الجرام) هيتقيد في رصيده النقدي — يخصم منه اللي هتدفعه دلوقتي.
+          أجر ${discountPercent>0? `(بعد خصم ${discountPercent}% من ${fmtCash(totalMakingBeforeDiscount)})` : '(الوزن × أجر الجرام)'} هيتقيد في رصيده النقدي — يخصم منه اللي هتدفعه دلوقتي.
           وهتفتح تلقائي شاشة كيو آر القطع عشان تطبعها على الطابعة الحرارية.
         </div>
         <div class="row">
           <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
           <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
-            ${pbEditId? `<button class="btn btn-ghost" onclick="printInvoicePieceQRs('${pbEditId}')" type="button">🖶 طباعة QR القطع</button>`
-                      : `<button class="btn btn-ghost" onclick="printPBItemsQR()" type="button">🖶 طباعة QR القطع</button>`}
+            <button class="btn btn-ghost" onclick="printPBItemsQR()" type="button">🖶 طباعة QR القطع المحددة</button>
             ${pbEditId? `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="discardPurchaseEdit()" type="button">🗑 حذف الفاتورة</button>`
                       : `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="cancelPurchaseBuilder()" type="button">🗑 حذف الفاتورة</button>`}
             <button class="btn btn-gold" style="width:100%;" onclick="submitPurchaseBuilderInvoice()">حفظ الفاتورة</button>
@@ -3629,10 +3637,20 @@ function renderPurchaseBuilder(){
   `;
 }
 
+function togglePBSelectAll(checked){
+  pb.items.forEach(it=> it.selected = checked);
+  render();
+}
+function togglePBItemSelected(tempId, checked){
+  const it = pb.items.find(x=>x.tempId===tempId);
+  if(it) it.selected = checked;
+  render();
+}
 function renderPBItemsRows(){
-  if(!pb.items.length) return `<tr class="empty-row"><td colspan="7">لسه معنديش قطع مضافة</td></tr>`;
+  if(!pb.items.length) return `<tr class="empty-row"><td colspan="8">لسه معنديش قطع مضافة</td></tr>`;
   return pb.items.map((it,idx)=>`
     <tr>
+      <td><input type="checkbox" ${it.selected!==false?'checked':''} onchange="togglePBItemSelected('${it.tempId}',this.checked)"></td>
       <td>${esc(it.classificationName)}</td>
       <td class="mono">${esc(it.code)}</td>
       <td>${esc(it.itemName)}</td>
@@ -3742,7 +3760,9 @@ function addPBNewCode(){
 
 function printPBItemsQR(){
   if(!pb.items.length){ toast('لسه مفيش قطع مضافة'); return; }
-  showPieceQRModal(pb.items);
+  const chosen = pb.items.filter(it=>it.selected!==false);
+  if(!chosen.length){ toast('حدد قطعة واحدة على الأقل من المربعات جنب الجدول'); return; }
+  showPieceQRModal(chosen);
 }
 function cancelPurchaseBuilder(){
   if(!pb.items.length){ pb=null; goto('purchases'); return; }
@@ -3771,7 +3791,7 @@ function addPBLine(){
     itemTypeId: product.itemTypeId, classificationId: product.classificationId, priceCategoryId: product.priceCategoryId,
     price, making: weight*price,
     weight, karat: pb.karat, lineTotal: weight*price,
-    serial, barcodeValue, uid: newPieceUid()
+    serial, barcodeValue, uid: newPieceUid(), selected: true
   });
   weightInput.value='';
   render();
@@ -3886,6 +3906,7 @@ function editPurchaseInvoice(id){
       merchantId: inv.merchantId,
       karat: inv.karat || merchantKarat(merchantById(inv.merchantId)),
       search:'', classFilter:'', selectedProductId:null,
+      discountPercent: Number(inv.discountPercent)||0,
       items: (inv.items||[]).map((it,i)=>{
         const pc = pieces[i];
         const prod = it.productCode? state.products.find(x=>x.code===it.productCode) : null;
@@ -3897,7 +3918,8 @@ function editPurchaseInvoice(id){
           itemTypeId: it.itemTypeId, classificationId: it.classificationId, priceCategoryId: it.priceCategoryId,
           price: it.price||it.makingPerGram||0, making: it.making!=null? it.making : (it.weight*(it.price||0)),
           weight: it.weight, karat: it.karat, lineTotal: it.making!=null? it.making : (it.weight*(it.price||0)),
-          serial: pc? pc.no : state.counters.piece, barcodeValue: pc? pc.barcodeValue : buildBarcodeValue(it.karat, it.weight, state.counters.piece)
+          serial: pc? pc.no : state.counters.piece, barcodeValue: pc? pc.barcodeValue : buildBarcodeValue(it.karat, it.weight, state.counters.piece),
+          uid: pc? pc.uid : newPieceUid(), selected: true
         };
       }),
       serialCursor: state.counters.piece
@@ -3917,7 +3939,9 @@ function submitPurchaseBuilderInvoice(){
   if(!pb.items.length){ toast('أضف قطعة واحدة على الأقل'); return; }
   if(!pb.merchantId){ toast('اختر التاجر'); return; }
   const totalWeight = pb.items.reduce((s,i)=>s+i.weight,0);
-  const totalMaking = pb.items.reduce((s,i)=>s+(i.making||0),0);
+  const totalMakingBeforeDiscount = pb.items.reduce((s,i)=>s+(i.making||0),0);
+  const discountPercent = Math.max(0, Math.min(100, Number(pb.discountPercent)||0));
+  const totalMaking = totalMakingBeforeDiscount * (1 - discountPercent/100);
   let paid = parseFloat(document.getElementById('pb-paid').value)||0;
   paid = Math.max(0, Math.min(paid, totalMaking));
   const items = pb.items;
@@ -3931,7 +3955,7 @@ function submitPurchaseBuilderInvoice(){
     // الذهب: يدخل مخزون الخزينة، ويتقيد للتاجر (سالب = ليه علينا)
     state.treasury.gold[karat] = (state.treasury.gold[karat]||0) + totalWeight;
     m.balanceGold[karat] = (m.balanceGold[karat]||0) - totalWeight;
-    // الأجر: اللي مدفوع دلوقتي يخرج من الخزينة، والباقي يتقيد فلوس للتاجر
+    // الأجر: اللي مدفوع دلوقتي يخرج من الخزينة، والباقي يتقيد فلوس للتاجر (بعد الخصم)
     state.treasury.cash -= paid;
     m.balanceCash -= (totalMaking - paid);
 
@@ -3943,7 +3967,7 @@ function submitPurchaseBuilderInvoice(){
       date: editing? (pbEditDate||todayStr()) : todayStr(),
       createdAt: editing? pbEditCreatedAt : new Date().toISOString(),
       merchantId, karat, items:invItems,
-      totalCash: totalMaking, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid};
+      totalCash: totalMaking, totalMakingBeforeDiscount, discountPercent, totalMaking, totalWeight, settleMode:'weight', amountPaidNow:paid};
     state.purchaseInvoices.push(rec);
 
     items.forEach((it,i)=>{
