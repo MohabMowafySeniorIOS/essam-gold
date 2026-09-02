@@ -8314,6 +8314,19 @@ function customerStatementEntries(cid){
 function goldMapLabelFromItems(items, sign){
   return items.map(i=> sign+Number(i.weight).toFixed(3)+' جم ع'+i.karat).join('، ');
 }
+/* تصحيح: تصفير رصيد ذهب عميل اتسجل غلط قبل إصلاح فواتير البيع (كانت بتسجل وزن ذهب بالغلط حتى لو العميل دفع كاش) */
+function zeroCustomerGoldBalance(customerId){
+  const c = customerById(customerId);
+  if(!c) return;
+  const g21 = goldTo21(c.balanceGold);
+  if(Math.abs(g21)<0.0005){ toast('رصيد الذهب أصلاً صفر'); return; }
+  showConfirmModal('تصفير رصيد الذهب المسجل لـ'+esc(c.name)+' ('+Math.abs(g21).toFixed(3)+' جم)؟ ده تصحيح لرصيد قديم متسجل غلط، ومش هيأثر على رصيده النقدي.', ()=>{
+    mutate(()=>{
+      state.karats.forEach(k=>{ c.balanceGold[k] = 0; });
+    }, 'تم تصفير رصيد الذهب لـ'+c.name);
+    closeModal();
+  }, {confirmLabel:'تصفير الرصيد'});
+}
 function renderCustomerStatement(){
   const cid = uiState.cstmtCustomerId || (state.customers[0]? state.customers[0].id : null);
   const c = cid? customerById(cid) : null;
@@ -8343,7 +8356,11 @@ function renderCustomerStatement(){
     </div>
     ${c? `<div class="grid grid-3" style="margin-bottom:16px;">
       <div class="card stat"><div class="label"><span>الرصيد النقدي الحالي</span></div><div class="value" style="color:${(c.balanceCash||0)>=0?'var(--green)':'var(--red)'};">${fmtCash(Math.abs(c.balanceCash||0))}</div></div>
-      <div class="card stat"><div class="label"><span>رصيد الذهب (ع${BASE_KARAT})</span></div><div class="value" style="color:${goldTo21(c.balanceGold)>=0?'var(--green)':'var(--red)'};">${Math.abs(goldTo21(c.balanceGold)).toFixed(3)} <small>جم</small></div></div>
+      <div class="card stat">
+        <div class="label"><span>رصيد الذهب (ع${BASE_KARAT})</span></div>
+        <div class="value" style="color:${goldTo21(c.balanceGold)>=0?'var(--green)':'var(--red)'};">${Math.abs(goldTo21(c.balanceGold)).toFixed(3)} <small>جم</small></div>
+        ${Math.abs(goldTo21(c.balanceGold))>0.0005? `<button class="btn btn-sm btn-ghost" style="margin-top:6px;color:#c0392b;" onclick="zeroCustomerGoldBalance('${c.id}')">🔧 تصفير الرصيد ده (تصحيح رصيد قديم)</button>`:''}
+      </div>
       <div class="card stat"><div class="label"><span>رقم العميل</span></div><div class="value" style="font-size:18px;">${esc(c.phone||'—')}</div></div>
     </div>`:''}
     <div id="cstmt-sheet" class="tbl-wrap">
