@@ -6362,7 +6362,6 @@ function submitCustomerSale(){
       const orig = Number(it.origWeight!=null? it.origWeight : it.weight)||it.weight;
       const remainder = Math.max(0, orig - it.weight);
       state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) - it.weight;
-      c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) + it.weight;
       const pc = state.pieces.find(x=>x.id===it.pieceId);
       if(pc){ pc.sold=true; pc.soldDate=todayStr(); pc.soldToCustomerId=customerId; pc.soldKind='customer'; }
       if(remainder>0.0005){
@@ -6424,7 +6423,6 @@ function deleteCustomerSale(id){
       const c = customerById(inv.customerId);
       (inv.items||[]).forEach(it=>{
         state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) + it.weight;
-        if(c) c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) - it.weight;
         if(it.remainderToScrap>0.0005){ state.scrapStock[it.karat] = (state.scrapStock[it.karat]||0) - it.remainderToScrap; }
         const pc = state.pieces.find(x=>x.id===it.pieceId);
         if(pc){ pc.sold=false; delete pc.soldDate; delete pc.soldToCustomerId; delete pc.soldKind; }
@@ -6643,7 +6641,6 @@ function reopenInvoice(kind, id){
         const c = customerById(inv.customerId);
         (inv.items||[]).forEach(it=>{
           state.treasury.gold[it.karat] = (state.treasury.gold[it.karat]||0) + it.weight;
-          if(c) c.balanceGold[it.karat] = (c.balanceGold[it.karat]||0) - it.weight;
           const pc = state.pieces.find(x=>x.id===it.pieceId);
           if(pc){ pc.sold=false; delete pc.soldDate; delete pc.soldToCustomerId; delete pc.soldKind; }
         });
