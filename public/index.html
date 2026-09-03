@@ -8,18 +8,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f2f5f9;
+    --bg:#f5f3ee;
     --panel:#ffffff;
-    --panel-2:#f5f7fa;
-    --line:#dfe4ea;
-    --gold:#17406e;          /* اللون الأساسي (كحلي) */
-    --gold-bright:#1b5aa0;   /* كحلي فاتح للعناوين والأرقام */
-    --gold-dim:#9fb4cc;
-    --navy:#17406e;
-    --navy-dark:#102c4d;
-    --text:#1f2937;
-    --muted:#5f6b7a;
-    --muted-2:#98a2b3;
+    --panel-2:#f1efe7;
+    --line:#ddd6c4;
+    --gold:#a6790a;          /* اللون الأساسي (دهبي) */
+    --gold-bright:#c9971e;   /* دهبي فاتح للعناوين والأرقام */
+    --gold-dim:#e7dcb8;
+    --navy:#a6790a;
+    --navy-dark:#7a5a05;
+    --text:#1a1a1a;
+    --muted:#6b6560;
+    --muted-2:#9a9488;
     --red:#c0392b;
     --red-bg:#fdecea;
     --green:#1e7e46;
@@ -36,81 +36,84 @@
     font-size:14px;
   }
   h1,h2,h3,.disp{font-family:'Almarai',sans-serif;}
-  ::selection{background:#cfe0f2;color:#102c4d;}
+  ::selection{background:#e7dcb8;color:#7a5a05;}
   ::-webkit-scrollbar{width:9px;height:9px;}
   ::-webkit-scrollbar-thumb{background:#c6d0dc;border-radius:8px;}
   ::-webkit-scrollbar-track{background:#eef1f5;}
 
-  #shell{display:flex;min-height:100vh;}
+  #shell{display:flex;flex-direction:column;min-height:100vh;}
 
-  /* SIDEBAR */
-  #sidebar{
-    width:250px;flex:none;
-    background:#17406e;
-    border-left:1px solid #0d2440;
-    padding:20px 12px 24px;
-    position:sticky;top:0;height:100vh;
-    display:flex;flex-direction:column;gap:3px;
-    overflow-y:auto;overscroll-behavior:contain;
+  /* TOOLBAR */
+  #toolbar{
+    flex:none;display:flex;align-items:center;gap:6px;
+    background:#141414;border-bottom:1px solid #000;
+    padding:8px 16px;position:sticky;top:0;z-index:50;
+    overflow-x:auto;overscroll-behavior:contain;
   }
-  #sidebar::-webkit-scrollbar{width:7px;}
-  #sidebar::-webkit-scrollbar-track{background:transparent;}
-  #sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:8px;}
-  #sidebar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.35);}
-  #sidebar{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;}
-  .brand{
-    display:flex;align-items:center;gap:10px;flex:none;
-    padding:0 8px 16px 8px;margin-bottom:6px;
-    border-bottom:1px solid rgba(255,255,255,.14);
-  }
-  a.brand-link{display:flex;align-items:center;gap:10px;flex:1;text-decoration:none;
-    border-radius:8px;padding:6px 6px;margin:-6px -6px;transition:.15s;cursor:pointer;}
-  a.brand-link:hover{background:rgba(255,255,255,.10);}
-  a.brand-link:hover .name{color:#fff;}
-  .brand .mark{
-    width:38px;height:38px;border-radius:8px;
+  #toolbar::-webkit-scrollbar{height:6px;}
+  #toolbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:8px;}
+  a.tb-brand{display:flex;align-items:center;gap:9px;flex:none;text-decoration:none;
+    border-radius:8px;padding:5px 8px;margin-inline-end:8px;transition:.15s;cursor:pointer;
+    border-inline-end:1px solid rgba(255,255,255,.14);}
+  a.tb-brand:hover{background:rgba(255,255,255,.10);}
+  .tb-brand .mark{
+    width:32px;height:32px;border-radius:8px;flex:none;
     background:#fff;
     display:flex;align-items:center;justify-content:center;
-    font-family:'Almarai',sans-serif;font-weight:800;color:#17406e;font-size:18px;
+    font-family:'Almarai',sans-serif;font-weight:800;color:#a6790a;font-size:15px;
   }
-  .brand .name{font-family:'Almarai',sans-serif;font-weight:800;font-size:16px;color:#fff;line-height:1.1;}
-  .brand .sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;}
+  .tb-brand-txt{display:none;}
+  .tb-brand .name{font-family:'Almarai',sans-serif;font-weight:800;font-size:14px;color:#fff;line-height:1.1;}
+  .tb-brand .sub{font-size:10px;color:rgba(255,255,255,.6);margin-top:2px;}
+  @media (min-width:860px){ .tb-brand-txt{display:block;} }
 
-  .navgroup-label{display:flex;align-items:center;gap:8px;width:calc(100% - 12px);
-    font-size:10.5px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.5px;
-    margin:10px 6px 4px;padding:6px 8px;border-radius:6px;flex:none;cursor:pointer;
-    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
-    text-align:start;font-family:inherit;transition:.15s;}
-  .navgroup-label:hover{background:rgba(255,255,255,.12);color:#fff;}
-  .navgroup-label .gchev{margin-inline-start:auto;font-size:10px;opacity:.8;transition:transform .18s;}
-  .navgroup-label.closed .gchev{transform:rotate(-90deg);}
-  .navgroup-label .gcount{background:rgba(255,255,255,.14);border-radius:20px;padding:0 6px;font-size:9.5px;}
-  .navgroup-label.hasactive{color:#fff;border-color:rgba(255,255,255,.45);background:rgba(255,255,255,.14);}
-  .navgroup-label.hasactive .gcount{background:#fff;color:#17406e;font-weight:800;}
+  .tb-groups{display:flex;align-items:center;gap:4px;flex:1;position:relative;}
+  .tb-group{position:relative;flex:none;}
+  .tb-gbtn{
+    display:flex;align-items:center;gap:7px;
+    background:transparent;border:1px solid transparent;color:rgba(255,255,255,.78);
+    padding:8px 12px;border-radius:8px;cursor:pointer;font-family:'Tajawal';
+    font-size:13px;font-weight:600;white-space:nowrap;transition:.15s;
+  }
+  .tb-gbtn:hover{background:rgba(255,255,255,.09);color:#fff;}
+  .tb-gbtn.hasactive{color:#a6790a;background:rgba(166,121,10,.16);border-color:rgba(166,121,10,.35);}
+  .tb-group.open .tb-gbtn{background:#a6790a;color:#fff;border-color:#a6790a;}
+  .tb-gic{font-size:15px;}
+  .tb-glabel{display:none;}
+  @media (min-width:1080px){ .tb-glabel{display:inline;} }
+  .tb-gchev{font-size:9px;opacity:.8;transition:transform .15s;}
+  .tb-group.open .tb-gchev{transform:rotate(180deg);}
+
+  .tb-dropdown{
+    position:absolute;top:calc(100% + 6px);inset-inline-start:0;
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 12px 28px rgba(0,0,0,.22);padding:8px;min-width:230px;
+    display:flex;flex-direction:column;gap:2px;z-index:60;
+    max-height:78vh;overflow-y:auto;
+  }
+  .tb-version{flex:none;font-size:10px;color:rgba(255,255,255,.4);padding:0 6px;white-space:nowrap;display:none;}
+  @media (min-width:1080px){ .tb-version{display:block;} }
+
   .navitem{
     display:flex;align-items:center;gap:10px;flex:none;
     padding:8px 12px;border-radius:6px;cursor:pointer;
-    color:rgba(255,255,255,.78);font-size:13px;font-weight:500;
+    color:var(--text);font-size:13px;font-weight:500;
     transition:.15s;border:1px solid transparent;
     user-select:none;white-space:nowrap;text-decoration:none;
   }
-  a.navitem,a.navitem:visited{color:rgba(255,255,255,.78);}
-  a.navitem.active,a.navitem.active:visited{color:#17406e;}
+  a.navitem,a.navitem:visited{color:var(--text);}
+  a.navitem.active,a.navitem.active:visited{color:#a6790a;}
   a.btn,a.btn:visited{text-decoration:none;color:var(--text);}
   a.btn-gold,a.btn-gold:visited{color:#fff;}
   a.btn-danger,a.btn-danger:visited{color:#a5281c;}
   .navitem .ic{width:18px;text-align:center;font-size:15px;opacity:.85;}
-  .navitem:hover{background:rgba(255,255,255,.09);color:#fff;}
+  .navitem:hover{background:var(--panel-2);}
   .navitem.active{
-    background:#fff;color:#17406e;border-color:#fff;font-weight:700;
+    background:#f5edd4;color:#a6790a;border-color:#e0cd8e;font-weight:700;
   }
-  .nav-version{margin-top:auto;padding:14px 12px 2px;font-size:10.5px;color:rgba(255,255,255,.42);
-    text-align:center;letter-spacing:.3px;flex:none;}
   .navitem.parent{cursor:pointer;}
-  .nav-chev{margin-inline-start:auto;font-size:11px;opacity:.75;transition:transform .18s;}
-  .navitem.parent.open .nav-chev{transform:rotate(180deg);}
   .navsub{display:flex;flex-direction:column;gap:2px;margin:2px 0 4px;
-    border-inline-start:2px solid rgba(255,255,255,.16);padding-inline-start:6px;margin-inline-start:14px;}
+    border-inline-start:2px solid var(--line);padding-inline-start:6px;margin-inline-start:14px;}
   .navitem.navchild{font-size:12.5px;padding:7px 10px;}
   .navitem .badge{
     margin-inline-start:auto;background:var(--red);color:#fff;font-size:10.5px;
@@ -171,7 +174,7 @@
   .empty-row td{text-align:center;color:var(--muted-2);padding:30px;}
 
   .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
-  .pill-gold{background:#e8f0fa;color:var(--navy);border:1px solid #c3d7ee;}
+  .pill-gold{background:#f5edd4;color:var(--navy);border:1px solid #e0cd8e;}
   .pill-green{background:var(--green-bg);color:var(--green);border:1px solid #bfe0cc;}
   .pill-red{background:var(--red-bg);color:#a5281c;border:1px solid #f0c2bc;}
   .pill-muted{background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
@@ -273,17 +276,17 @@
     color:#333;font-size:13px;padding:6px 9px;font-family:'Tajawal',sans-serif;
   }
   .report-sheet .rep-frow > input[readonly]{background:#f7f7f7;color:#555;text-align:left;}
-  .report-sheet .rep-frow > input:focus,.report-sheet .rep-frow > select:focus{border-color:#17406e;}
+  .report-sheet .rep-frow > input:focus,.report-sheet .rep-frow > select:focus{border-color:#a6790a;}
 
   .report-sheet .rep-bar{
-    background:#17406e;color:#fff;font-size:14.5px;font-weight:700;
+    background:#a6790a;color:#fff;font-size:14.5px;font-weight:700;
     padding:11px 16px;margin:0 0 10px;font-family:'Almarai',sans-serif;
   }
   .report-sheet .rep-colsbar{position:relative;margin-bottom:8px;}
   .report-sheet .rep-colsbtn{
     display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#777;cursor:pointer;user-select:none;
   }
-  .report-sheet .rep-colsbtn:hover{color:#17406e;}
+  .report-sheet .rep-colsbtn:hover{color:#a6790a;}
   .report-sheet .rep-colsmenu{
     position:absolute;top:22px;right:0;z-index:20;background:#fff;border:1px solid #ccc;
     border-radius:5px;box-shadow:0 6px 18px rgba(0,0,0,.15);padding:8px 10px;min-width:150px;
@@ -355,7 +358,7 @@
   .sq-f input,.sq-f select{padding:6px 9px;font-size:12.5px;border-radius:4px;}
   .sq-ro{background:#f7f7f7;font-family:'Almarai';font-weight:800;text-align:left;}
   .sq-ro.pos{color:var(--green);} .sq-ro.neg{color:var(--red);}
-  .sq-sub{background:#17406e;color:#fff;font-family:'Almarai';font-weight:800;font-size:14px;
+  .sq-sub{background:#a6790a;color:#fff;font-family:'Almarai';font-weight:800;font-size:14px;
     text-align:center;padding:7px;border-radius:4px;margin-bottom:8px;}
   .sq-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
   .sq-stat{flex:1;min-width:150px;background:#f5f8fc;border:1px solid #dde6f0;border-radius:6px;padding:7px 10px;
@@ -374,51 +377,10 @@
 
 
   /* ================= الموبايل والتابلت ================= */
-  #mobile-bar{display:none;}
-  #sidebar-overlay{display:none;}
-  .nav-close{display:none;}
-
   @media (max-width: 980px){
-    /* شريط علوي ثابت */
-    #mobile-bar{
-      display:flex;align-items:center;gap:12px;
-      position:sticky;top:0;z-index:45;
-      background:#17406e;color:#fff;padding:10px 14px;
-      box-shadow:0 2px 10px rgba(16,44,77,.25);
-    }
-    #mb-burger{
-      background:transparent;border:1px solid rgba(255,255,255,.3);border-radius:8px;
-      width:40px;height:38px;display:flex;flex-direction:column;justify-content:center;
-      align-items:center;gap:4px;cursor:pointer;padding:0;flex:none;
-    }
-    #mb-burger span{display:block;width:18px;height:2px;background:#fff;border-radius:2px;}
-    #mb-title{flex:1;font-family:'Almarai',sans-serif;font-weight:800;font-size:15px;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    #mb-brand{
-      width:34px;height:34px;border-radius:8px;background:#fff;color:#17406e;flex:none;
-      display:flex;align-items:center;justify-content:center;font-family:'Almarai',sans-serif;
-      font-weight:800;font-size:16px;
-    }
-
-    /* القائمة الجانبية تبقى درج منزلق */
-    #sidebar{
-      position:fixed;top:0;right:0;bottom:0;height:100dvh;width:272px;max-width:86vw;
-      z-index:60;transform:translateX(106%);transition:transform .22s ease;
-      box-shadow:-10px 0 30px rgba(0,0,0,.35);padding:16px 12px 24px;
-    }
-    body.nav-open #sidebar{transform:translateX(0);}
-    #sidebar-overlay{
-      position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:55;
-      opacity:0;pointer-events:none;transition:opacity .2s ease;display:block;
-    }
-    body.nav-open #sidebar-overlay{opacity:1;pointer-events:auto;}
-    body.nav-open{overflow:hidden;}
+    #toolbar{padding:6px 10px;gap:3px;}
+    .tb-gbtn{padding:8px 9px;}
     .navitem{padding:11px 12px;font-size:14px;}
-    .nav-close{
-      display:flex;align-items:center;justify-content:center;
-      width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.12);
-      border:none;color:#fff;font-size:17px;cursor:pointer;flex:none;margin-inline-start:auto;
-    }
 
     /* المحتوى */
     #main{padding:14px 12px 90px;max-width:100%;}
@@ -603,14 +565,8 @@
 <style id="thermal-page-style"></style>
 </head>
 <body>
-<div id="mobile-bar">
-  <button id="mb-burger" onclick="toggleNav()" aria-label="القائمة"><span></span><span></span><span></span></button>
-  <div id="mb-title">دفتر الصائغ</div>
-  <div id="mb-brand">ذ</div>
-</div>
-<div id="sidebar-overlay" onclick="closeNav()"></div>
 <div id="shell">
-  <aside id="sidebar"></aside>
+  <nav id="toolbar"></nav>
   <main id="main"></main>
 </div>
 <div id="modal-root"></div>
@@ -1020,7 +976,7 @@ function goldMapTotalsRow(map){
 
 /* ============================= NAV ============================= */
 const NAV = [
-  {group:'الرئيسية', items:[
+  {group:'الرئيسية', icon:'🏠', items:[
     {id:'home', label:'لوحة التحكم', icon:'⬛'},
     {id:'system-code', label:'System Code', icon:'⚙', children:[
       {id:'gold-prices', label:'أسعار الذهب', icon:'💰'},
@@ -1030,20 +986,20 @@ const NAV = [
     {id:'dashboard', label:'الخزينة', icon:'◆'},
     {id:'manufacture', label:'التصنيع', icon:'⚒'},
   ]},
-  {group:'الكسر', items:[
+  {group:'الكسر', icon:'⛃', items:[
     {id:'scrap-ledger', label:'نظرة عامة', icon:'⛃'},
     {id:'scrap', label:'شراء دهب كسر', icon:'⬇'},
     {id:'scrap-sell', label:'بيع دهب كسر', icon:'⬆'},
     {id:'scrap-settle', label:'تسوية الكسر', icon:'⚖'},
     {id:'scrap-losses', label:'خسائر الكسر', icon:'📉'},
   ]},
-  {group:'الأصناف', items:[
+  {group:'الأصناف', icon:'▤', items:[
     {id:'catalog', label:'الأصناف والمنتجات', icon:'▤'},
     {id:'pieces', label:'باركود القطع', icon:'▥'},
     {id:'piece-lookup', label:'اسكان قطعة / تحركاتها', icon:'🔍'},
     {id:'piece-return', label:'مرتجع قطع ذهب', icon:'↩'},
   ]},
-  {group:'التجار', items:[
+  {group:'التجار', icon:'⌘', items:[
     {id:'merchants', label:'التجار وأكوادهم', icon:'⌘'},
     {id:'merchant-summary', label:'إجمالي أرصدة التجار', icon:'≡'},
     {id:'merchant-statement', label:'كشف حساب تاجر', icon:'▦'},
@@ -1053,7 +1009,7 @@ const NAV = [
     {id:'transfers', label:'تحويل أرصدة بين التجار', icon:'⇋'},
     {id:'squares', label:'المربعات', icon:'▩', badgeKey:'pendingCount'},
   ]},
-  {group:'العملاء', items:[
+  {group:'العملاء', icon:'👤', items:[
     {id:'customers', label:'العملاء وأكوادهم', icon:'👤'},
     {id:'customer-summary', label:'إجمالي أرصدة العملاء', icon:'≡'},
     {id:'customer-statement', label:'كشف حساب عميل', icon:'▦'},
@@ -1062,12 +1018,12 @@ const NAV = [
     {id:'invoice-scan', label:'اسكان كيو آر فاتورة', icon:'▣'},
     {id:'customer-transfers', label:'تحويل أرصدة بين العملاء', icon:'⇋'},
   ]},
-  {group:'القطع', items:[
+  {group:'القطع', icon:'◫', items:[
     {id:'lots', label:'قطع ذهب (شراء / بيع)', icon:'◫'},
     {id:'lots-report', label:'تقرير القطعات', icon:'📊'},
     {id:'lots-profit', label:'فرق وأرباح القطعات', icon:'📈'},
   ]},
-  {group:'التقارير', items:[
+  {group:'التقارير', icon:'📊', items:[
     {id:'rep-sales', label:'تقرير الفواتير المباعة', icon:'📗'},
     {id:'rep-returns', label:'تقرير فواتير المرتجعات', icon:'📕'},
     {id:'rep-purchases', label:'تقرير المشتريات من التجار', icon:'📘'},
@@ -1075,83 +1031,70 @@ const NAV = [
     {id:'rep-profit', label:'تقرير أرباح المحل', icon:'💹'},
     {id:'year-closing', label:'تقفيل ميزان سنوي', icon:'📅'},
   ]},
-  {group:'الحسابات', items:[
+  {group:'الحسابات', icon:'⇄', items:[
     {id:'settlements', label:'تسوية الحسابات', icon:'⇄'},
   ]},
 ];
 
+let openToolbarGroup = null; // اسم المجموعة اللي القائمة المنسدلة بتاعتها مفتوحة دلوقتي، أو null
+function toggleToolbarGroup(group){
+  openToolbarGroup = (openToolbarGroup===group) ? null : group;
+  renderSidebar();
+}
+function closeToolbarGroup(){
+  if(openToolbarGroup===null) return;
+  openToolbarGroup = null;
+  renderSidebar();
+}
 function renderSidebar(){
   const pendingCount = state.pendingSales.filter(p=>p.status==='pending').length;
   let html = `
-    <div class="brand">
-      <a class="brand-link" href="${viewHref('home')}" title="ارجع للوحة التحكم" onclick="return navClick(event,'home')">
-        <div class="mark">ذ</div>
-        <div>
-          <div class="name">دفتر الصائغ</div>
-          <div class="sub">إدارة حسابات محل الذهب</div>
-        </div>
-      </a>
-      <button class="nav-close" onclick="closeNav()" aria-label="إغلاق">✕</button>
-    </div>`;
+    <a class="tb-brand" href="${viewHref('home')}" title="ارجع للوحة التحكم" onclick="closeToolbarGroup();return navClick(event,'home')">
+      <div class="mark">ذ</div>
+      <div class="tb-brand-txt">
+        <div class="name">دفتر الصائغ</div>
+        <div class="sub">إدارة حسابات محل الذهب</div>
+      </div>
+    </a>
+    <div class="tb-groups">`;
   NAV.forEach(g=>{
     const hasActive = g.items.some(it=> it.id===currentView || (it.children||[]).some(c=>c.id===currentView));
-    const gOpen = navGroupOpen(g.group);
-    html += `<button type="button" class="navgroup-label ${gOpen?'':'closed'} ${(hasActive&&!gOpen)?'hasactive':''}" onclick="toggleNavSection('${esc(g.group)}')">
-      <span>${esc(g.group)}</span><span class="gcount">${g.items.length}</span><span class="gchev">▾</span></button>`;
-    if(!gOpen) return;
-    g.items.forEach(it=>{
-      const badge = it.badgeKey==='pendingCount' && pendingCount>0 ? `<span class="badge">${pendingCount}</span>` : '';
-      if(it.children && it.children.length){
-        const childActive = it.children.some(c=>c.id===currentView);
-        const open = uiState.navOpen[it.id] || childActive || currentView===it.id;
-        const active = (currentView===it.id) ? 'active':'';
-        html += `<div class="navitem parent ${active} ${open?'open':''}" onclick="toggleNavGroup('${it.id}')">
-          <span class="ic">${it.icon}</span><span>${esc(it.label)}</span><span class="nav-chev">▾</span>
-        </div>`;
-        if(open){
+    const open = openToolbarGroup===g.group;
+    html += `<div class="tb-group${open?' open':''}">
+      <button type="button" class="tb-gbtn ${hasActive?'hasactive':''}" onclick="event.stopPropagation();toggleToolbarGroup('${esc(g.group)}')">
+        <span class="tb-gic">${g.icon||'▫'}</span><span class="tb-glabel">${esc(g.group)}</span><span class="tb-gchev">▾</span>
+      </button>`;
+    if(open){
+      html += `<div class="tb-dropdown" onclick="event.stopPropagation();">`;
+      g.items.forEach(it=>{
+        const badge = it.badgeKey==='pendingCount' && pendingCount>0 ? `<span class="badge">${pendingCount}</span>` : '';
+        if(it.children && it.children.length){
+          const active = currentView===it.id ? 'active':'';
+          html += `<a class="navitem ${active}" href="${viewHref(it.id)}" onclick="closeToolbarGroup();return navClick(event,'${it.id}')">
+            <span class="ic">${it.icon}</span><span>${esc(it.label)}</span>
+          </a>`;
           html += `<div class="navsub">` + it.children.map(c=>`
-            <a class="navitem navchild ${currentView===c.id?'active':''}" href="${viewHref(c.id)}" onclick="return navClick(event,'${c.id}')">
+            <a class="navitem navchild ${currentView===c.id?'active':''}" href="${viewHref(c.id)}" onclick="closeToolbarGroup();return navClick(event,'${c.id}')">
               <span class="ic">${c.icon}</span><span>${esc(c.label)}</span>
             </a>`).join('') + `</div>`;
+          return;
         }
-        return;
-      }
-      const active = currentView===it.id ? 'active':'';
-      html += `<a class="navitem ${active}" href="${viewHref(it.id)}" onclick="return navClick(event,'${it.id}')">
-        <span class="ic">${it.icon}</span><span>${esc(it.label)}</span>${badge}
-      </a>`;
-    });
+        const active = currentView===it.id ? 'active':'';
+        html += `<a class="navitem ${active}" href="${viewHref(it.id)}" onclick="closeToolbarGroup();return navClick(event,'${it.id}')">
+          <span class="ic">${it.icon}</span><span>${esc(it.label)}</span>${badge}
+        </a>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
   });
-  html += `<div class="nav-version">الإصدار ${APP_VERSION} · ${APP_BUILD}</div>`;
-  document.getElementById('sidebar').innerHTML = html;
-  updateMobileTitle();
+  html += `</div><div class="tb-version">${APP_VERSION} · ${APP_BUILD}</div>`;
+  document.getElementById('toolbar').innerHTML = html;
 }
 
-function toggleNavGroup(id){
-  uiState.navOpen[id] = !uiState.navOpen[id];
-  renderSidebar();
-}
-/* أقسام السايدبار: العنوان بقى زرار بيفتح/بيقفل القسم */
-function navGroupOpen(group){
-  uiState.navSections = uiState.navSections || {};
-  return uiState.navSections[group] !== false;   // مفتوح افتراضيًا
-}
-function saveNavSections(){
-  try{ localStorage.setItem('navSections', JSON.stringify(uiState.navSections||{})); }catch(e){}
-}
-function toggleNavSection(group){
-  uiState.navSections = uiState.navSections || {};
-  uiState.navSections[group] = !navGroupOpen(group);
-  saveNavSections();
-  renderSidebar();
-}
 /* لما تفتح صفحة، القسم بتاعها يفتح لوحده — بس تفضل قادر تقفله بإيدك */
-function openNavSectionOf(view){
-  const g = NAV.find(g=> g.items.some(it=> it.id===view || (it.children||[]).some(c=>c.id===view)));
-  if(!g) return;
-  uiState.navSections = uiState.navSections || {};
-  if(uiState.navSections[g.group] === false){ uiState.navSections[g.group] = true; saveNavSections(); }
-}
+/* مش محتاجين نفتح قسم تلقائي في تصميم التولبار الجديد — القوائم المنسدلة بتتقفل لوحدها بعد أي تنقل */
+function openNavSectionOf(view){}
 
 /* ====== قائمة الموبايل ====== */
 function toggleNav(){ document.body.classList.toggle('nav-open'); }
@@ -1181,7 +1124,7 @@ function navClick(ev, view){
   // لو المستخدم ضغط بزرار أوسط أو Ctrl/Cmd سيب المتصفح يفتح تاب جديد
   if(ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button===1)) return true;
   if(ev) ev.preventDefault();
-  closeNav();
+  closeToolbarGroup();
   goto(view);
   return false;
 }
@@ -1207,7 +1150,36 @@ window.addEventListener('hashchange', ()=>{
   applyHash();
 });
 
-/* ====== Enter = إضافة/حفظ في أي مودال أو أي كارت فيه زرار إضافة ====== */
+/* ====== تحويل الأرقام العربية/الفارسية لإنجليزية تلقائيًا وانت بتكتب في أي خانة رقمية ====== */
+function convertArabicDigits(str){
+  return String(str).replace(/[٠-٩۰-۹]/g, function(d){
+    const code = d.charCodeAt(0);
+    if(code>=0x0660 && code<=0x0669) return String(code-0x0660); // أرقام عربية هندية
+    if(code>=0x06F0 && code<=0x06F9) return String(code-0x06F0); // أرقام فارسية
+    return d;
+  });
+}
+document.addEventListener('input', (e)=>{
+  const el = e.target;
+  if(!el || !el.tagName) return;
+  if(el.tagName.toUpperCase()!=='INPUT') return;
+  const type = (el.getAttribute('type')||'text').toLowerCase();
+  const mode = (el.getAttribute('inputmode')||'').toLowerCase();
+  if(type!=='tel' && mode!=='decimal' && mode!=='numeric') return;
+  if(!/[٠-٩۰-۹]/.test(el.value||'')) return;
+  const start = el.selectionStart, end = el.selectionEnd;
+  el.value = convertArabicDigits(el.value);
+  try{ el.setSelectionRange(start, end); }catch(err){}
+}, true);
+
+/* ====== قفل القائمة المنسدلة في التولبار لو دُس بره الشريط ====== */
+document.addEventListener('click', (e)=>{
+  if(openToolbarGroup===null) return;
+  const tb = document.getElementById('toolbar');
+  if(tb && !tb.contains(e.target)) closeToolbarGroup();
+});
+
+
 document.addEventListener('keydown', (e)=>{
   if(e.key!=='Enter' || e.shiftKey) return;
   const t = e.target;
@@ -1285,7 +1257,7 @@ function render(){
   if(pendingFocusId){
     const id = pendingFocusId; pendingFocusId = null;
     const el = document.getElementById(id);
-    if(el){ el.focus(); try{ el.select(); }catch(e){} }
+    if(el){ el.focus(); try{ const len=el.value.length; el.setSelectionRange(len,len); }catch(e){} }
   }
 }
 let pendingFocusId = null;
@@ -1625,7 +1597,7 @@ function openCashMoveModal(dir){
       <div class="modal">
         <h2>${dir==='in'?'إيداع نقدية بالخزينة':'سحب نقدية من الخزينة'}</h2>
         <div class="hint">حركة نقدية مباشرة لا ترتبط بفاتورة</div>
-        <div class="field"><label>المبلغ</label><input type="number" id="cm-amt" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label>المبلغ</label><input type="text" inputmode="decimal" id="cm-amt" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field"><label>بيان</label><input type="text" id="cm-note" placeholder="سبب الحركة (اختياري)"></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -1804,12 +1776,12 @@ function openScrapModal(editId){
           <div class="field"><label>العيار</label>
             <select id="sc-karat" onchange="applyScrapKaratPrice()">${state.karats.map(k=>`<option value="${k}" ${ed&&Number(ed.karat)===k?'selected':''}>عيار ${k}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>الوزن (جم)</label><input type="number" id="sc-weight" min="0" step="0.001" placeholder="0.000" value="${ed? Number(ed.weight||0).toFixed(3) : ''}"></div>
+          <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" id="sc-weight" min="0" step="0.001" placeholder="0.000" value="${ed? Number(ed.weight||0).toFixed(3) : ''}"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (نازل من سعر الشراء المحدد)</label><input type="number" id="sc-price" min="0" step="0.01" placeholder="0.00" value="${ed? Number(ed.pricePerGram||0).toFixed(2) : ''}" oninput="recalcScrapTotal()"></div>
+          <div class="field"><label>سعر الجرام (نازل من سعر الشراء المحدد)</label><input type="text" inputmode="decimal" id="sc-price" min="0" step="0.01" placeholder="0.00" value="${ed? Number(ed.pricePerGram||0).toFixed(2) : ''}" oninput="recalcScrapTotal()"></div>
           <div class="field"><label>الإجمالي (تقدر تكتبه وهيحسب سعر الجرام)</label>
-            <input type="number" min="0" step="0.01" id="sc-total" value="${ed? Number(ed.totalCash||0).toFixed(2) : '0.00'}" oninput="recalcScrapFromTotal()"></div>
+            <input type="text" inputmode="decimal" min="0" step="0.01" id="sc-total" value="${ed? Number(ed.totalCash||0).toFixed(2) : '0.00'}" oninput="recalcScrapFromTotal()"></div>
         </div>
         <div class="hint" id="sc-price-src" style="margin-top:-8px;margin-bottom:4px;"></div>
         <div class="hint" id="sc-total-hint" style="margin-top:0;margin-bottom:12px;color:var(--navy);"></div>
@@ -1989,12 +1961,12 @@ function openScrapSellModal(editId){
           <div class="field"><label>العيار</label>
             <select id="ss-karat" onchange="applyScrapSellKaratPrice()">${state.karats.map(k=>`<option value="${k}" ${ed&&Number(ed.karat)===k?'selected':''}>عيار ${k} — متاح ${fmtW(scrapStockOf(k))}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>الوزن (جم)</label><input type="number" id="ss-weight" min="0" step="0.001" placeholder="0.000" value="${ed? Number(ed.weight||0).toFixed(3) : ''}" oninput="recalcScrapSellTotal()"></div>
+          <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" id="ss-weight" min="0" step="0.001" placeholder="0.000" value="${ed? Number(ed.weight||0).toFixed(3) : ''}" oninput="recalcScrapSellTotal()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (نازل من سعر البيع المحدد)</label><input type="number" id="ss-price" min="0" step="0.01" placeholder="0.00" value="${ed? Number(ed.pricePerGram||0).toFixed(2) : ''}" oninput="recalcScrapSellTotal()"></div>
+          <div class="field"><label>سعر الجرام (نازل من سعر البيع المحدد)</label><input type="text" inputmode="decimal" id="ss-price" min="0" step="0.01" placeholder="0.00" value="${ed? Number(ed.pricePerGram||0).toFixed(2) : ''}" oninput="recalcScrapSellTotal()"></div>
           <div class="field"><label>الإجمالي (تقدر تكتبه وهيحسب سعر الجرام)</label>
-            <input type="number" min="0" step="0.01" id="ss-total" value="${ed? Number(ed.totalCash||0).toFixed(2) : '0.00'}" oninput="recalcScrapSellFromTotal()"></div>
+            <input type="text" inputmode="decimal" min="0" step="0.01" id="ss-total" value="${ed? Number(ed.totalCash||0).toFixed(2) : '0.00'}" oninput="recalcScrapSellFromTotal()"></div>
         </div>
         <div class="hint" id="ss-price-src" style="margin-top:-8px;margin-bottom:12px;"></div>
         <div class="field"><label>اسم الموظف <span style="color:var(--red);">*</span></label>
@@ -2102,7 +2074,7 @@ function renderScrapSettle(){
             return `<tr>
               <td style="font-weight:700;">عيار ${k}</td>
               <td class="right num">${fmtW(sys)}</td>
-              <td><input type="number" step="0.001" id="settle-${k}" placeholder="${sys.toFixed(3)}" style="width:130px;"></td>
+              <td><input type="text" inputmode="decimal" step="0.001" id="settle-${k}" placeholder="${sys.toFixed(3)}" style="width:130px;"></td>
               <td class="right num muted" id="settle-diff-${k}">—</td>
               <td><button class="btn btn-sm btn-gold" onclick="submitScrapSettle(${k})">تسجيل التسوية</button></td>
             </tr>`;
@@ -2308,8 +2280,8 @@ function renderPriceCategoriesTab(){
       <label>فئة سعرية جديدة</label>
       <div class="row">
         <div class="field"><label>الاسم أو الرمز</label><input id="pc-new-name" placeholder="اسم أو رمز الفئة السعرية" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
-        <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="number" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
-        <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="number" step="0.01" id="pc-new-sell" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="text" inputmode="decimal" step="0.01" id="pc-new-price" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
+        <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="text" inputmode="decimal" step="0.01" id="pc-new-sell" value="0.00" onkeydown="if(event.key==='Enter'){event.preventDefault();addPriceCategory();}"></div>
       </div>
       <button class="btn btn-gold" onclick="addPriceCategory()">+ إضافة</button>
     </div>
@@ -2362,8 +2334,8 @@ function openEditPriceCategoryModal(id){
         <div class="hint">سعر التكلفة بيستخدم في فواتير الشراء من التجار، وسعر البيع بيستخدم في فواتير مبيعات العملاء — وكل الأكواد المرتبطة بالفئة هتاخد الأسعار الجديدة تلقائيًا في أول فاتورة جاية</div>
         <div class="field"><label>الاسم أو الرمز</label><input id="pc-edit-name" value="${esc(pc.name)}"></div>
         <div class="row">
-          <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="number" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
-          <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="number" step="0.01" id="pc-edit-sell" value="${(pc.sellPrice!=null? pc.sellPrice : (pc.price||0)).toFixed(2)}"></div>
+          <div class="field"><label>سعر التكلفة (أجر الجرام للشراء)</label><input type="text" inputmode="decimal" step="0.01" id="pc-edit-price" value="${(pc.price||0).toFixed(2)}"></div>
+          <div class="field"><label>سعر البيع (أجر الجرام للعميل)</label><input type="text" inputmode="decimal" step="0.01" id="pc-edit-sell" value="${(pc.sellPrice!=null? pc.sellPrice : (pc.price||0)).toFixed(2)}"></div>
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -2509,11 +2481,11 @@ function renderPieces(){
         </div>
         <div class="f" style="min-width:110px;">
           <label style="margin-bottom:4px;">عرض تيكت الحرارية (مم)</label>
-          <input type="number" step="1" value="${thermalLabelSize().w}" onchange="setThermalLabelSize(this.value, null)">
+          <input type="text" inputmode="decimal" step="1" value="${thermalLabelSize().w}" onchange="setThermalLabelSize(this.value, null)">
         </div>
         <div class="f" style="min-width:110px;">
           <label style="margin-bottom:4px;">طول تيكت الحرارية (مم)</label>
-          <input type="number" step="1" value="${thermalLabelSize().h}" onchange="setThermalLabelSize(null, this.value)">
+          <input type="text" inputmode="decimal" step="1" value="${thermalLabelSize().h}" onchange="setThermalLabelSize(null, this.value)">
         </div>
         <div class="f" style="min-width:180px;">
           <label style="margin-bottom:4px;">كلمة مرور السوبر يوزر (لتخطي قفل الـ24 ساعة)</label>
@@ -2825,15 +2797,15 @@ function tplSelectedPanelHTML(){
     <div style="font-weight:800;margin-bottom:10px;">${TPL_TYPE_NAMES[el.type]||el.type}</div>
     ${el.type==='text'? `<div class="field"><label>النص</label><input value="${esc(el.text||'')}" onchange="tplUpdateSelected('text', this.value)"></div>` : ''}
     <div class="row">
-      <div class="field"><label>X (مم)</label><input type="number" step="0.5" value="${el.x.toFixed(1)}" onchange="tplUpdateSelected('x', this.value)"></div>
-      <div class="field"><label>Y (مم)</label><input type="number" step="0.5" value="${el.y.toFixed(1)}" onchange="tplUpdateSelected('y', this.value)"></div>
+      <div class="field"><label>X (مم)</label><input type="text" inputmode="decimal" step="0.5" value="${el.x.toFixed(1)}" onchange="tplUpdateSelected('x', this.value)"></div>
+      <div class="field"><label>Y (مم)</label><input type="text" inputmode="decimal" step="0.5" value="${el.y.toFixed(1)}" onchange="tplUpdateSelected('y', this.value)"></div>
     </div>
     <div class="row">
-      <div class="field"><label>العرض (مم)</label><input type="number" step="0.5" value="${el.w.toFixed(1)}" onchange="tplUpdateSelected('w', this.value)"></div>
-      <div class="field"><label>الطول (مم)</label><input type="number" step="0.5" value="${el.h.toFixed(1)}" onchange="tplUpdateSelected('h', this.value)"></div>
+      <div class="field"><label>العرض (مم)</label><input type="text" inputmode="decimal" step="0.5" value="${el.w.toFixed(1)}" onchange="tplUpdateSelected('w', this.value)"></div>
+      <div class="field"><label>الطول (مم)</label><input type="text" inputmode="decimal" step="0.5" value="${el.h.toFixed(1)}" onchange="tplUpdateSelected('h', this.value)"></div>
     </div>
-    ${(el.type!=='qr' && el.type!=='image')? `<div class="field"><label>حجم الخط (نقطة)</label><input type="number" step="0.2" value="${el.fontSize.toFixed(1)}" onchange="tplUpdateSelected('fontSize', this.value)"></div>` : ''}
-    <div class="field"><label>تدوير (درجة)</label><input type="number" step="15" value="${el.rotate||0}" onchange="tplUpdateSelected('rotate', this.value)"></div>
+    ${(el.type!=='qr' && el.type!=='image')? `<div class="field"><label>حجم الخط (نقطة)</label><input type="text" inputmode="decimal" step="0.2" value="${el.fontSize.toFixed(1)}" onchange="tplUpdateSelected('fontSize', this.value)"></div>` : ''}
+    <div class="field"><label>تدوير (درجة)</label><input type="text" inputmode="decimal" step="15" value="${el.rotate||0}" onchange="tplUpdateSelected('rotate', this.value)"></div>
     <button class="btn btn-sm btn-ghost" style="margin-top:4px;color:#c0392b;" onclick="tplDeleteSelected()">🗑 حذف العنصر</button>
   `;
 }
@@ -3633,9 +3605,9 @@ function invoiceItemsTemplate(prefix, items){
       <div><label>العيار</label>
         <select class="${prefix}-karat">${state.karats.map(k=>`<option value="${k}" ${it.karat==k?'selected':''}>ع${k}</option>`).join('')}</select>
       </div>
-      <div><label>الوزن (جم)</label><input type="number" step="0.001" class="${prefix}-weight" value="${it.weight||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
-      <div><label>سعر الجرام</label><input type="number" step="0.01" class="${prefix}-price" value="${it.price||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
-      <div><label>مصنعية</label><input type="number" step="0.01" class="${prefix}-making" value="${it.making||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
+      <div><label>الوزن (جم)</label><input type="text" inputmode="decimal" step="0.001" class="${prefix}-weight" value="${it.weight||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
+      <div><label>سعر الجرام</label><input type="text" inputmode="decimal" step="0.01" class="${prefix}-price" value="${it.price||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
+      <div><label>مصنعية</label><input type="text" inputmode="decimal" step="0.01" class="${prefix}-making" value="${it.making||''}" oninput="recalcInvoiceTotal('${prefix}')"></div>
       <div class="rm" onclick="removeItemRow('${prefix}', this)">✕</div>
     </div>
   `).join('');
@@ -3855,7 +3827,7 @@ function renderPurchaseBuilder(){
           </div>
           <div class="field" style="margin:0;min-width:160px;">
             <label style="margin-bottom:3px;">نسبة الخصم على الأجر (%)</label>
-            <input type="number" step="0.5" min="0" max="100" value="${discountPercent}" onchange="pb.discountPercent=Math.max(0,Math.min(100,parseFloat(this.value)||0));render();">
+            <input type="text" inputmode="decimal" step="0.5" min="0" max="100" value="${discountPercent}" onchange="pb.discountPercent=Math.max(0,Math.min(100,parseFloat(this.value)||0));render();">
           </div>
         </div>
 
@@ -3866,7 +3838,7 @@ function renderPurchaseBuilder(){
           وهتفتح تلقائي شاشة كيو آر القطع عشان تطبعها على الطابعة الحرارية.
         </div>
         <div class="row">
-          <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
+          <div class="field"><label>المدفوع نقداً الآن (من الأجر)</label><input type="text" inputmode="decimal" step="0.01" id="pb-paid" value="${totalMaking.toFixed(2)}"></div>
           <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
             <button class="btn btn-ghost" onclick="printPBItemsQR()" type="button">🖶 طباعة QR القطع المحددة</button>
             ${pbEditId? `<button class="btn btn-ghost" style="color:#c0392b;border-color:#c0392b;" onclick="discardPurchaseEdit()" type="button">🗑 حذف الفاتورة</button>`
@@ -3950,7 +3922,7 @@ function renderPBAddForm(){
       <span class="kv-chip">أجر الجرام: <b>${fmtCash(pc?pc.price||0:0)}</b></span>
     </div>
     <div class="field"><label>الوزن (جم) — Enter للإضافة</label>
-      <input type="number" step="0.001" id="pb-weight" placeholder="0.000" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}">
+      <input type="text" inputmode="decimal" step="0.001" id="pb-weight" placeholder="0.000" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}">
     </div>
     <div class="hint" style="margin:-6px 0 12px;">الأجر بيتحسب تلقائيًا: الوزن × أجر الجرام (${fmtCash(pc?pc.price||0:0)})</div>
     <button class="btn btn-sm btn-gold" onclick="addPBLine()" type="button">+ إضافة للفاتورة</button>
@@ -3965,7 +3937,7 @@ function renderPBCatalogRows(){
     const cl = state.classifications.find(x=>x.id===p.classificationId);
     const pc = state.priceCategories.find(x=>x.id===p.priceCategoryId);
     const active = pb.selectedProductId===p.id;
-    return `<tr style="cursor:pointer;${active?'background:#e8f0fa;':''}" onclick="selectPBProduct('${p.id}')">
+    return `<tr style="cursor:pointer;${active?'background:#f5edd4;':''}" onclick="selectPBProduct('${p.id}')">
       <td>${cl?esc(cl.name):'<span class="muted">—</span>'}</td>
       <td class="mono">${esc(p.code)}</td>
       <td>${it?esc(it.name):'<span class="muted">—</span>'}</td>
@@ -4286,7 +4258,7 @@ function openInvoiceModal(kind){
 
         <div class="row" style="margin-top:14px;">
           <div class="field"><label>الإجمالي</label><input id="${prefix}-total" readonly value="0.00"></div>
-          <div class="field"><label>المدفوع نقداً الآن</label><input type="number" id="${prefix}-paid" data-auto="1" value="0.00" oninput="this.dataset.auto='0'"></div>
+          <div class="field"><label>المدفوع نقداً الآن</label><input type="text" inputmode="decimal" id="${prefix}-paid" data-auto="1" value="0.00" oninput="this.dataset.auto='0'"></div>
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -4345,7 +4317,7 @@ function goldItemRowTemplate(prefix, items){
       <div><label>العيار</label>
         <select class="${prefix}-karat">${state.karats.map(k=>`<option value="${k}" ${it.karat==k?'selected':''}>ع${k}</option>`).join('')}</select>
       </div>
-      <div><label>الوزن (جم)</label><input type="number" step="0.001" class="${prefix}-weight" value="${it.weight||''}"></div>
+      <div><label>الوزن (جم)</label><input type="text" inputmode="decimal" step="0.001" class="${prefix}-weight" value="${it.weight||''}"></div>
       <div class="rm" onclick="removeGoldItemRow('${prefix}', this)">✕</div>
     </div>
   `).join('');
@@ -4389,7 +4361,7 @@ function openCPModal(kind, presetMerchantId){
         <div id="cp-items">${goldItemRowTemplate('cp')}</div>
         <button class="btn btn-sm btn-ghost" onclick="addGoldItemRow('cp')" type="button">+ إضافة عيار</button>
 
-        <div class="field" style="margin-top:14px;"><label>${isCollect?'المبلغ النقدي':'المبلغ النقدي'}</label><input type="number" step="0.01" id="cp-cash" value="0"></div>
+        <div class="field" style="margin-top:14px;"><label>${isCollect?'المبلغ النقدي':'المبلغ النقدي'}</label><input type="text" inputmode="decimal" step="0.01" id="cp-cash" value="0"></div>
         <div class="field"><label>طريقة السداد</label>
           <select id="cp-cashmode">
             <option value="treasury">${isCollect?'وارد فعلاً للخزينة':'صادر فعلاً من الخزينة'}</option>
@@ -4493,7 +4465,7 @@ function editCPRecord(kind, id){
         <label>أوزان بالعيارات</label>
         <div id="cpe-items">${goldItemRowTemplate('cpe', rec.items&&rec.items.length? rec.items : null)}</div>
         <button class="btn btn-sm btn-ghost" onclick="addGoldItemRow('cpe')" type="button">+ إضافة عيار</button>
-        <div class="field" style="margin-top:14px;"><label>المبلغ النقدي</label><input type="number" step="0.01" id="cpe-cash" value="${rec.cash||0}"></div>
+        <div class="field" style="margin-top:14px;"><label>المبلغ النقدي</label><input type="text" inputmode="decimal" step="0.01" id="cpe-cash" value="${rec.cash||0}"></div>
         <div class="field"><label>طريقة السداد</label>
           <select id="cpe-cashmode">
             <option value="treasury" ${rec.cashMode==='treasury'?'selected':''}>${isCollect?'وارد فعلاً للخزينة':'صادر فعلاً من الخزينة'}</option>
@@ -4658,7 +4630,7 @@ function renderSaleBuilder(){
               <td>${esc(it.itemName)}</td>
               <td class="muted">عيار ${it.karat}</td>
               <td class="right num">${it.weight.toFixed(3)} جم</td>
-              <td><input type="number" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setSaleRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setSaleRate('${it.pieceId}',this.value)"></td>
               <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making)}</td>
               <td><span class="rm" style="display:inline-block;" onclick="removeSaleLine('${it.pieceId}')">✕</span></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="9">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
@@ -4678,7 +4650,7 @@ function renderSaleBuilder(){
       و<b style="color:var(--gold-bright);">${fmtCash(totalMaking)}</b> أجر هيتقيد لنا على التاجر — يخصم منه اللي هتحصّله دلوقتي.
     </div>
     <div class="row">
-      <div class="field"><label>المحصّل نقداً الآن (من الأجر)</label><input type="number" step="0.01" id="sb-paid" value="${totalMaking.toFixed(2)}"></div>
+      <div class="field"><label>المحصّل نقداً الآن (من الأجر)</label><input type="text" inputmode="decimal" step="0.01" id="sb-paid" value="${totalMaking.toFixed(2)}"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
         <button class="btn btn-gold" style="width:100%;" onclick="submitSaleBuilderInvoice()">حفظ الفاتورة</button>
       </div>
@@ -4770,10 +4742,10 @@ function openPendingModal(){
           <div class="field"><label>العيار</label>
             <select id="pd-karat">${state.karats.map(k=>`<option value="${k}">عيار ${k}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>الوزن (جم)</label><input type="number" step="0.001" id="pd-weight" oninput="recalcPendingTotal()"></div>
+          <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" step="0.001" id="pd-weight" oninput="recalcPendingTotal()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام</label><input type="number" step="0.01" id="pd-price" oninput="recalcPendingTotal()"></div>
+          <div class="field"><label>سعر الجرام</label><input type="text" inputmode="decimal" step="0.01" id="pd-price" oninput="recalcPendingTotal()"></div>
           <div class="field"><label>الإجمالي</label><input id="pd-total" readonly value="0.00"></div>
         </div>
         <div class="field"><label>ملاحظة (اختياري)</label><input id="pd-note" placeholder="وصف القطعة"></div>
@@ -4888,9 +4860,9 @@ function openSettlementModal(kind, presetId){
           <div class="field"><label>العيار</label>
             <select id="st-karat">${state.karats.map(k=>`<option value="${k}" ${k===BASE_KARAT?'selected':''}>عيار ${k}</option>`).join('')}<option value="">بدون ذهب</option></select>
           </div>
-          <div class="field"><label>وزن الذهب (جم)</label><input type="number" step="0.001" id="st-weight" value="0"></div>
+          <div class="field"><label>وزن الذهب (جم)</label><input type="text" inputmode="decimal" step="0.001" id="st-weight" value="0"></div>
         </div>
-        <div class="field"><label>مبلغ نقدي</label><input type="number" step="0.01" id="st-cash" value="0"></div>
+        <div class="field"><label>مبلغ نقدي</label><input type="text" inputmode="decimal" step="0.01" id="st-cash" value="0"></div>
         <div class="field"><label>سبب التسوية</label><input id="st-note" placeholder="مثال: فرق جرد، خطأ فاتورة سابقة..."></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -4987,9 +4959,9 @@ function openTransferModal(kind){
           <div class="field"><label>العيار</label>
             <select id="tr-karat">${state.karats.map(k=>`<option value="${k}" ${k===BASE_KARAT?'selected':''}>عيار ${k}</option>`).join('')}<option value="">بدون ذهب</option></select>
           </div>
-          <div class="field"><label>وزن الذهب (جم)</label><input type="number" step="0.001" id="tr-weight" value="0"></div>
+          <div class="field"><label>وزن الذهب (جم)</label><input type="text" inputmode="decimal" step="0.001" id="tr-weight" value="0"></div>
         </div>
-        <div class="field"><label>مبلغ نقدي</label><input type="number" step="0.01" id="tr-cash" value="0"></div>
+        <div class="field"><label>مبلغ نقدي</label><input type="text" inputmode="decimal" step="0.01" id="tr-cash" value="0"></div>
         <div class="field"><label>ملاحظة</label><input id="tr-note" placeholder="سبب التحويل"></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>
@@ -5399,7 +5371,7 @@ function openCCPModal(kind, presetId){
         <label>أوزان بالعيارات</label>
         <div id="ccp-items">${goldItemRowTemplate('ccp')}</div>
         <button class="btn btn-sm btn-ghost" onclick="addGoldItemRow('ccp')" type="button">+ إضافة عيار</button>
-        <div class="field" style="margin-top:14px;"><label>المبلغ النقدي</label><input type="number" step="0.01" id="ccp-cash" value="0"></div>
+        <div class="field" style="margin-top:14px;"><label>المبلغ النقدي</label><input type="text" inputmode="decimal" step="0.01" id="ccp-cash" value="0"></div>
         <div class="field"><label>طريقة السداد</label>
           <select id="ccp-cashmode">
             <option value="treasury">${isCollect?'وارد فعلاً للخزينة':'صادر فعلاً من الخزينة'}</option>
@@ -5641,10 +5613,10 @@ function openLotModal(dir, editId){
           <div class="field"><label>العيار</label>
             <select id="lot-karat" onchange="recalcLot()">${state.karats.map(k=>`<option value="${k}" ${(l? l.karat:BASE_KARAT)===k?'selected':''}>عيار ${k}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>وزن القطع (جم)</label><input type="number" step="0.001" id="lot-weight" value="${l? l.weight:''}" placeholder="0.000" oninput="recalcLot()"></div>
+          <div class="field"><label>وزن القطع (جم)</label><input type="text" inputmode="decimal" step="0.001" id="lot-weight" value="${l? l.weight:''}" placeholder="0.000" oninput="recalcLot()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="number" step="0.01" id="lot-price" value="${l? l.pricePerGram21 : (((dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT))||'')&&(dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT)).toFixed(2))}" placeholder="0.00" oninput="recalcLot()"></div>
+          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="text" inputmode="decimal" step="0.01" id="lot-price" value="${l? l.pricePerGram21 : (((dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT))||'')&&(dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT)).toFixed(2))}" placeholder="0.00" oninput="recalcLot()"></div>
           <div class="field"><label>الوزن المحوّل لعيار ${BASE_KARAT}</label><input id="lot-w21" readonly value="0.000" style="font-weight:800;color:var(--navy);"></div>
         </div>
         <div class="row">
@@ -5652,7 +5624,7 @@ function openLotModal(dir, editId){
           <div class="field"><label>سعر الجرام المكافئ لعيار العملية</label><input id="lot-priceK" readonly value="0.00"></div>
         </div>
         <div class="field"><label>${dir==='buy'? 'المدفوع نقداً الآن' : 'المحصّل نقداً الآن'}</label>
-          <input type="number" step="0.01" id="lot-cash" value="${l? (l.cashNow||0):''}" placeholder="0.00">
+          <input type="text" inputmode="decimal" step="0.01" id="lot-cash" value="${l? (l.cashNow||0):''}" placeholder="0.00">
         </div>
         <div class="hint" style="margin-top:-6px;">الوزن بيتقيد على رصيد ذهب ${kind==='customer'?'العميل':'التاجر'} ويدخل/يخرج من مخزون الخزينة. الباقي من القيمة بعد النقدي بيتقيد على رصيده النقدي.</div>
         <div class="field"><label>اسم الموظف</label>
@@ -6225,7 +6197,7 @@ function renderCustomerSaleBuilder(){
       <div class="grid grid-3" style="align-items:flex-end;">
         <div class="field" style="margin:0;">
           <label>سعر البيع لعيار ${BASE_KARAT}</label>
-          <input type="number" step="0.01" id="csb-price21" value="${Number(price21||0).toFixed(2)}"
+          <input type="text" inputmode="decimal" step="0.01" id="csb-price21" value="${Number(price21||0).toFixed(2)}"
             onchange="csbSetPrice21(this.value)"
             onkeydown="if(event.key==='Enter'){event.preventDefault();csbSetPrice21(this.value);}">
           <div class="muted" style="font-size:11px;margin-top:4px;">تعديل السعر ده بيحدّث سعر جرام الذهب لكل القطع حسب عيارها</div>
@@ -6233,7 +6205,7 @@ function renderCustomerSaleBuilder(){
         <div class="field" style="margin:0;">
           <label>التوزيع (اكتب إجمالي الفاتورة)</label>
           <div style="display:flex;gap:8px;">
-            <input type="number" step="0.01" id="csb-distribute" placeholder="اكتب إجمالي الفاتورة ليتوزع على القطع"
+            <input type="text" inputmode="decimal" step="0.01" id="csb-distribute" placeholder="اكتب إجمالي الفاتورة ليتوزع على القطع"
               value="${csb.distribute!=null? Number(csb.distribute).toFixed(2):''}"
               onkeydown="if(event.key==='Enter'){event.preventDefault();csbDistribute();}">
             <button class="btn" style="white-space:nowrap;" onclick="csbDistribute()">وزّع</button>
@@ -6243,7 +6215,7 @@ function renderCustomerSaleBuilder(){
         <div class="field" style="margin:0;">
           <label>الإجمالي (يدوي)</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input type="number" step="0.01" id="csb-total" placeholder="اكتب إجمالي الفاتورة"
+            <input type="text" inputmode="decimal" step="0.01" id="csb-total" placeholder="اكتب إجمالي الفاتورة"
               style="font-size:22px;font-weight:800;color:var(--green);text-align:center;"
               value="${(csb.manualTotal!=null && csb.manualTotal!=='')? Number(csb.manualTotal).toFixed(2):''}"
               onchange="csbSetManualTotal(this.value)"
@@ -6268,11 +6240,11 @@ function renderCustomerSaleBuilder(){
               <td><input value="${esc(it.itemName)}" style="padding:6px 8px;font-size:12.5px;width:110px;" onchange="setCustomerSaleItemName('${it.pieceId}',this.value)"></td>
               <td class="muted">${esc(classificationName(it.classificationId))}</td>
               <td class="muted">عيار ${it.karat}</td>
-              <td><input type="number" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
-              <td><input type="number" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
-              <td><input type="number" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
               <td class="total-col">
-                <input type="number" step="0.01" value="${Number(it.lineTotal||0).toFixed(2)}"
+                <input type="text" inputmode="decimal" step="0.01" value="${Number(it.lineTotal||0).toFixed(2)}"
                   style="padding:6px 8px;font-size:13px;font-weight:800;color:var(--navy);text-align:left;"
                   onchange="setCustomerSaleLineTotal('${it.pieceId}',this.value)">
                 <div class="muted" style="font-size:10px;font-weight:400;">ذهب ${fmtCash(it.goldValue||0)} + أجر ${fmtCash(it.making||0)}</div></td>
@@ -6307,7 +6279,7 @@ function renderCustomerSaleBuilder(){
         </select>
       </div>
       <div class="field"><label>المحصّل نقداً الآن (من إجمالي الفاتورة)</label>
-        <input type="number" step="0.01" id="csb-paid" value="${csbPaidDefault(totalAll).toFixed(2)}"
+        <input type="text" inputmode="decimal" step="0.01" id="csb-paid" value="${csbPaidDefault(totalAll).toFixed(2)}"
           ${csb.payMode==='partial'?'':'readonly'} oninput="csbSetPaidAmount(this.value)"></div>
       <div class="field">
         <label>الباقي على حساب العميل</label>
@@ -6551,7 +6523,7 @@ function printInvoiceWithQR(kind, id){
   const area = document.getElementById('report-print-area');
   area.innerHTML = `
     <div style="font-family:'Tajawal',sans-serif;direction:rtl;color:#000;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #17406e;padding-bottom:8px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #a6790a;padding-bottom:8px;margin-bottom:12px;">
         <div>
           <div style="font-family:'Almarai',sans-serif;font-weight:800;font-size:20px;">${esc(shopName())}</div>
           <div style="font-size:14px;margin-top:4px;">${esc(invoiceKindLabel(kind))} رقم #${inv.no}</div>
@@ -6560,7 +6532,7 @@ function printInvoiceWithQR(kind, id){
         </div>
         <div style="text-align:center;">${svg}</div>
       </div>
-      ${inv.note? `<div style="border:1px solid #bbb;border-right:4px solid #17406e;padding:7px 10px;margin-bottom:10px;font-size:12.5px;">
+      ${inv.note? `<div style="border:1px solid #bbb;border-right:4px solid #a6790a;padding:7px 10px;margin-bottom:10px;font-size:12.5px;">
         <b>البيان:</b> <span style="white-space:pre-wrap;">${esc(inv.note)}</span></div>`:''}
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="background:#eef2f7;">
@@ -7531,8 +7503,8 @@ function renderReturnBuilder(kind){
               <td>${esc(it.itemName)}</td>
               <td class="muted">عيار ${it.karat}</td>
               <td class="right num">${it.weight.toFixed(3)} جم</td>
-              <td><input type="number" step="0.01" value="${(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setReturnGoldRate('${it.pieceId}',this.value)"></td>
-              <td><input type="number" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setReturnRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" value="${(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setReturnGoldRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" value="${it.rate.toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setReturnRate('${it.pieceId}',this.value)"></td>
               <td class="right num" style="font-weight:700;color:var(--red);">${fmtCash(it.making)}</td>
               <td><span class="rm" style="display:inline-block;" onclick="removeReturnLine('${it.pieceId}')">✕</span></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="10">امسح باركود القطعة المرتجعة</td></tr>`}
@@ -7541,7 +7513,7 @@ function renderReturnBuilder(kind){
     </div>
 
     <div class="row">
-      <div class="field"><label>المرتجع نقداً الآن (بيخرج من الخزينة)</label><input type="number" step="0.01" id="rb-paid" value="${totalMaking.toFixed(2)}"></div>
+      <div class="field"><label>المرتجع نقداً الآن (بيخرج من الخزينة)</label><input type="text" inputmode="decimal" step="0.01" id="rb-paid" value="${totalMaking.toFixed(2)}"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
         <button class="btn btn-danger" style="width:100%;font-size:14px;" onclick="submitReturnInvoice()">حفظ فاتورة المرتجع</button>
       </div>
@@ -7754,7 +7726,7 @@ function mfbCoreHTML(inModal){
                   <td>${esc(it.classificationName||'—')}</td>
                   <td class="mono">${esc(it.code)}</td>
                   <td>${esc(it.itemName)}</td>
-                  <td><input type="number" step="0.001" value="${Number(it.pieceWeight).toFixed(3)}" style="padding:5px 7px;font-size:12.5px;"
+                  <td><input type="text" inputmode="decimal" step="0.001" value="${Number(it.pieceWeight).toFixed(3)}" style="padding:5px 7px;font-size:12.5px;"
                        onchange="setMfbWeight(${idx},'pieceWeight',this.value,${inModal})"></td>
                   <td class="right num muted">${fmtW(Math.max(0,it.scrapWeight-it.pieceWeight))}</td>
                   <td><span class="rm" style="display:inline-block;" onclick="removeMfbItem(${idx},${inModal})">✕</span></td>
@@ -7799,7 +7771,7 @@ function mfbCoreHTML(inModal){
             <select id="${inModal?'mfbm':'mfb'}-product">${state.products.map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(productLabel(x))}</option>`).join('')}</select>
           </div>
           <div class="field"><label>وزن القطعة الناتجة (جم)</label>
-              <input type="number" step="0.001" id="${inModal?'mfbm':'mfb'}-weight" placeholder="0.000"
+              <input type="text" inputmode="decimal" step="0.001" id="${inModal?'mfbm':'mfb'}-weight" placeholder="0.000"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();addMfbItem(${inModal});}"></div>
           <button class="btn btn-gold" style="width:100%;" onclick="addMfbItem(${inModal})">+ إضافة القطعة</button>
         </div>
@@ -8480,8 +8452,8 @@ function renderSquares(){
         <div class="sq-f"><span>عيار</span>
           <select id="sq-karat">${state.karats.map(k=>`<option value="${k}" ${karat===k?'selected':''}>${k}</option>`).join('')}</select>
         </div>
-        <div class="sq-f"><span>الوزن</span><input type="number" step="0.001" id="sq-weight" placeholder="0.000" oninput="sqRecalc()"></div>
-        <div class="sq-f"><span>السعر</span><input type="number" step="0.01" id="sq-price" placeholder="0.00" oninput="sqRecalc()"></div>
+        <div class="sq-f"><span>الوزن</span><input type="text" inputmode="decimal" step="0.001" id="sq-weight" placeholder="0.000" oninput="sqRecalc()"></div>
+        <div class="sq-f"><span>السعر</span><input type="text" inputmode="decimal" step="0.01" id="sq-price" placeholder="0.00" oninput="sqRecalc()"></div>
         <div class="sq-f"><span>الإجمالي</span><input id="sq-total" readonly class="sq-ro" value="0.00"></div>
         <div class="sq-f grow"><span>كود المرتجع أو المردود</span>
           <input id="sq-retcode" placeholder="ادخل كود المرتجع أو المردود"
@@ -8515,7 +8487,7 @@ function renderSquares(){
               <td>${esc(p.itemName||'—')}</td>
               <td class="right num">${fmtW(p.weight)}</td>
               <td>${st==='pending'
-                ? `<input type="number" step="0.01" value="${Number(p.pricePerGram||0).toFixed(2)}" style="padding:5px 7px;font-size:12.5px;text-align:left;"
+                ? `<input type="text" inputmode="decimal" step="0.01" value="${Number(p.pricePerGram||0).toFixed(2)}" style="padding:5px 7px;font-size:12.5px;text-align:left;"
                      onchange="setPendingPrice('${p.id}',this.value)">`
                 : `<span class="num">${fmtCash(p.pricePerGram)}</span>`}</td>
               <td class="right num" style="font-weight:800;color:var(--navy);">${fmtCash(p.totalCash)}</td>
@@ -8852,7 +8824,7 @@ function renderGoldPrices(){
       <div class="gp-row">
         <div class="gp-box sell" style="grid-column:1 / -1;">
           <label>سعر البيع (سعر الجرام لعيار ${BASE_KARAT})</label>
-          <input type="number" step="0.01" id="gp-sell21" value="${Number(g.sell21||0).toFixed(2)}">
+          <input type="text" inputmode="decimal" step="0.01" id="gp-sell21" value="${Number(g.sell21||0).toFixed(2)}">
         </div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
@@ -8882,7 +8854,7 @@ function renderGoldPrices(){
           const manual = goldIsManual(k,'sell');
           return `<tr ${k===BASE_KARAT?'style="background:#f3f7fc;"':''}>
             <td style="font-weight:800;">عيار ${k}${k===BASE_KARAT?' <span class="pill pill-gold">أساسي</span>':''}</td>
-            <td><input type="number" step="0.01" value="${sp.toFixed(2)}" style="text-align:left;color:var(--green);font-weight:700;"
+            <td><input type="text" inputmode="decimal" step="0.01" value="${sp.toFixed(2)}" style="text-align:left;color:var(--green);font-weight:700;"
                  onchange="setGoldKaratPrice(${k},'sell',this.value)"></td>
             <td><span class="pill ${manual?'pill-gold':'pill-muted'}">${manual?'سعر يدوي':'تلقائي من ع'+BASE_KARAT}</span></td>
             <td>${manual? `<button class="btn btn-sm btn-ghost" onclick="clearGoldKaratPrice(${k})">رجّع تلقائي</button>` : '<span class="muted" style="font-size:11.5px;">—</span>'}</td>
