@@ -2531,7 +2531,7 @@ function renderPieces(){
     <div class="filterbar">
       <div class="fb-row">
         <div class="f" style="min-width:260px;"><span>بحث بالصنف أو التصنيف أو الكود</span>
-          <input placeholder="اكتب اسم الصنف..." value="${esc(uiState.pcSearch||'')}" oninput="uiState.pcSearch=this.value;render();">
+          <input id="pieces-search" placeholder="اكتب اسم الصنف..." value="${esc(uiState.pcSearch||'')}" oninput="uiState.pcSearch=this.value;refocusAfterRender('pieces-search');render();">
         </div>
         <div class="f" style="min-width:230px;"><span>بحث بالباركود</span>
           <input placeholder="امسح الباركود واضغط Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();uiState.pcSearch=this.value;render();}">
@@ -3094,11 +3094,12 @@ function renderMerchants(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="openCPModal('collect')" ${state.merchants.length?'':'disabled'}>↙ تحصيل من تاجر</button>
         <button class="btn" onclick="openCPModal('pay')" ${state.merchants.length?'':'disabled'}>↗ تسديد لتاجر</button>
+        <button class="btn" onclick="openSettlementModal('merchant')" ${state.merchants.length?'':'disabled'}>⇄ تسوية حساب</button>
         <button class="btn btn-gold" onclick="openMerchantModal()">+ تاجر جديد</button>
       </div>
     </div>
     <div class="searchbar">
-      <input placeholder="بحث بالاسم أو الكود..." value="${esc(uiState.txtSearch)}" oninput="uiState.txtSearch=this.value;render();">
+      <input id="merchants-search" placeholder="بحث بالاسم أو الكود..." value="${esc(uiState.txtSearch)}" oninput="uiState.txtSearch=this.value;refocusAfterRender('merchants-search');render();">
     </div>
     <div class="tbl-wrap">
       <table>
@@ -4864,7 +4865,7 @@ function renderSettlements(){
     </div>
   `;
 }
-function openSettlementModal(kind){
+function openSettlementModal(kind, presetId){
   kind = kind || 'merchant';
   const parties = kind==='customer'? state.customers : state.merchants;
   if(!parties.length){ toast(kind==='customer'?'أضف عميلاً أولاً':'أضف تاجرًا أولاً'); return; }
@@ -4875,7 +4876,7 @@ function openSettlementModal(kind){
         <h2>تسوية حساب ${kind==='customer'?'عميل':'تاجر'}</h2>
         <div class="hint">مدين — له: يزيد ما لنا عنده · دائن — عليه: يزيد ما علينا له</div>
         <div class="field"><label>${kind==='customer'?'العميل':'التاجر'}</label>
-          <select id="st-party">${parties.map(m=>`<option value="${m.id}">${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
+          <select id="st-party">${parties.map(m=>`<option value="${m.id}" ${presetId===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}</select>
         </div>
         <div class="field"><label>نوع التسوية</label>
           <select id="st-type">
@@ -5256,11 +5257,12 @@ function renderCustomers(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn" onclick="openCCPModal('collect')" ${state.customers.length?'':'disabled'}>↙ تحصيل من عميل</button>
         <button class="btn" onclick="openCCPModal('pay')" ${state.customers.length?'':'disabled'}>↗ تسديد لعميل</button>
+        <button class="btn" onclick="openSettlementModal('customer')" ${state.customers.length?'':'disabled'}>⇄ تسوية حساب</button>
         <button class="btn btn-gold" onclick="openCustomerModal()">+ عميل جديد</button>
       </div>
     </div>
     <div class="searchbar">
-      <input placeholder="بحث بالاسم أو الكود أو رقم الموبايل..." value="${esc(uiState.custSearch||'')}" oninput="uiState.custSearch=this.value;render();">
+      <input id="customers-search" placeholder="بحث بالاسم أو الكود أو رقم الموبايل..." value="${esc(uiState.custSearch||'')}" oninput="uiState.custSearch=this.value;refocusAfterRender('customers-search');render();">
     </div>
     <div class="tbl-wrap">
       <table>
@@ -6076,6 +6078,12 @@ function recalcCsbLine(it){
   it.making    = it.weight * (Number(it.rate)||0);
   it.lineTotal = it.goldValue + it.making;
 }
+function setCustomerSaleItemName(pieceId, val){
+  const it = csb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  it.itemName = String(val||'').trim() || it.itemName;
+  saveCsbDraft(); render();
+}
 function setCustomerSaleWeight(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
@@ -6257,7 +6265,7 @@ function renderCustomerSaleBuilder(){
               <td class="mono muted">${it.no}</td>
               <td class="mono" style="font-size:12px;">${esc(it.barcodeValue||'—')}</td>
               <td class="mono">${esc(it.code)}</td>
-              <td>${esc(it.itemName)}</td>
+              <td><input value="${esc(it.itemName)}" style="padding:6px 8px;font-size:12.5px;width:110px;" onchange="setCustomerSaleItemName('${it.pieceId}',this.value)"></td>
               <td class="muted">${esc(classificationName(it.classificationId))}</td>
               <td class="muted">عيار ${it.karat}</td>
               <td><input type="number" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
@@ -6395,16 +6403,21 @@ function promptRemainderToScrap(remaindersByKarat, savedId){
   const root=document.getElementById('modal-root');
   root.innerHTML = `
     <div class="modal-bg">
-      <div class="modal" style="max-width:420px;">
+      <div class="modal" style="max-width:460px;">
         <h2>⚖️ فيه باقي رجع للكسر</h2>
         <div class="hint" style="margin-bottom:10px;">الفرق بين وزن القطعة الأصلي والوزن المباع رجع لرصيد الكسر: ${lines}</div>
         <p style="font-size:13.5px;color:var(--muted);margin-bottom:14px;">عاوز تكوّد الباقي دلوقتي كقطعة جديدة جاهزة للبيع، ولا تسيبه في رصيد الكسر وتكوّده بعدين؟</p>
-        <div class="modal-actions">
+        <div class="modal-actions" style="flex-wrap:wrap;">
+          <button class="btn btn-ghost" style="color:#c0392b;" onclick="cancelJustSavedSale('${savedId}')">↺ إلغاء — رجّعني للفاتورة</button>
           <button class="btn btn-ghost" onclick="skipRemainderRecode('${savedId}')">تخطي</button>
           <button class="btn btn-gold" onclick="openRemainderRecode('${savedId}')">🔨 كوّد الباقي دلوقتي</button>
         </div>
       </div>
     </div>`;
+}
+function cancelJustSavedSale(savedId){
+  closeModal();
+  reopenInvoice('CS', savedId);
 }
 function skipRemainderRecode(savedId){
   closeModal();
