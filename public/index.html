@@ -1310,6 +1310,7 @@ function render(){
     'silver-pieces': renderSilverPiecesBarcode,
     'silver-sales': renderSilverSales,
     'silver-customer-sales': renderSilverCustomerSales,
+    'silver-customer-sale-builder': renderScbBuilder,
     'system-code': renderSystemCode,
     'gold-prices': renderGoldPrices,
     backup: renderBackup,
@@ -1985,7 +1986,7 @@ function editSilverPurchaseBuilder(id){
       const pc = it.pieceId? state.silverPieces.find(x=>x.id===it.pieceId) : null;
       return { tempId: uid('dft'), classificationId: it.classificationId||null, itemTypeId: it.itemTypeId,
         itemName: it.itemName, code: it.code, weight: it.weight, price: it.price, lineTotal: it.lineTotal!=null? it.lineTotal : it.weight*it.price,
-        uid: pc? pc.uid : newPieceUid() };
+        uid: pc? pc.uid : newPieceUid(), selected: true };
     })
   };
   mutate(()=>{
@@ -1997,13 +1998,17 @@ function editSilverPurchaseBuilder(id){
 }
 function renderSilverPurchaseBuilder(){
   if(!svb) resetSilverPurchaseBuilder();
+  const merchant = merchantById(svb.merchantId);
+  const cashBal = merchant? merchant.balanceCash : 0;
+  const silverBal = merchant? Number(merchant.balanceSilver&&merchant.balanceSilver[svb.purity])||0 : 0;
   const purities = state.silverPurities||DEFAULT_SILVER_PURITIES;
   const totalWeight = svb.items.reduce((s,i)=>s+i.weight,0);
   const totalCash = svb.items.reduce((s,i)=>s+i.lineTotal,0);
+  const selCount = svb.items.filter(it=>it.selected!==false).length;
   return `
     <div class="pagehead">
       <div><h1>${svbEditId? 'تعديل فاتورة شراء فضة #'+svbEditNo : 'فاتورة شراء فضة من تاجر'}</h1>
-        <p>ضيف كل قطعة فضة بوزنها وسعرها لوحدها — كل قطعة بتاخد كود فريد وQR خاص بيها وتدخل مخزون الفضة</p></div>
+        <p>اختار الكود من الكتالوج، ادخل الوزن — الأجر بيتحسب تلقائيًا وكل قطعة بتاخد كود فريد وQR خاص بيها</p></div>
       ${navBtn('silver-purchases','← رجوع لقائمة الفواتير')}
     </div>
     <div class="card" style="margin-bottom:16px;">
@@ -2020,16 +2025,28 @@ function renderSilverPurchaseBuilder(){
           </select>
         </div>
       </div>
+      ${merchant? `<div class="kv-inline" style="margin-top:12px;">
+        <span class="kv-chip">رصيد فضة التاجر (عيار ${svb.purity}): <b style="color:${silverBal>0?'var(--green)':silverBal<0?'var(--red)':'var(--muted-2)'};">${Math.abs(silverBal).toFixed(3)} جم${silverBal>0?' — لنا':silverBal<0?' — علينا':''}</b></span>
+        <span class="kv-chip">رصيد نقدية التاجر: <b style="color:${cashBal>=0?'var(--green)':'var(--red)'};">${fmtCash(Math.abs(cashBal))}</b></span>
+      </div>`:''}
     </div>
     <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;">
       <div>
-        <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
+        <div class="section-title" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span>القطع المضافة في الفاتورة<div class="line"></div></span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="muted" style="font-size:12px;">المحدد: <b>${selCount}</b> من ${svb.items.length}</span>
+            <button class="btn btn-sm" onclick="toggleSvbSelectAll(true)">تحديد الكل</button>
+            <button class="btn btn-sm" onclick="toggleSvbSelectAll(false)">إلغاء التحديد</button>
+          </div>
+        </div>
         <div class="tbl-wrap" style="margin-bottom:12px;">
           <table>
-            <thead><tr><th>التصنيف</th><th>الصنف</th><th>الكود</th><th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right">الإجمالي</th><th></th></tr></thead>
+            <thead><tr><th style="width:34px;"><input type="checkbox" checked onchange="toggleSvbSelectAll(this.checked)"></th><th>التصنيف</th><th>الصنف</th><th>الكود</th><th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right">الإجمالي</th><th></th></tr></thead>
             <tbody>
               ${svb.items.length? svb.items.map((it,idx)=>`
                 <tr>
+                  <td><input type="checkbox" ${it.selected!==false?'checked':''} onchange="toggleSvbItemSelected('${it.tempId}',this.checked)"></td>
                   <td class="muted">${esc(classificationName(it.classificationId)||'—')}</td>
                   <td>${esc(it.itemName)}</td>
                   <td class="mono" style="font-size:11.5px;">${esc(it.code)}</td>
@@ -2037,9 +2054,9 @@ function renderSilverPurchaseBuilder(){
                   <td class="right num">${fmtCash(it.price)}</td>
                   <td class="right num" style="font-weight:700;color:var(--navy);">${fmtCash(it.lineTotal)}</td>
                   <td><span class="rm" style="display:inline-block;" onclick="removeSvbLine('${it.tempId}')">✕</span></td>
-                </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لسه معندكش قطع مضافة</td></tr>`}
+                </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لسه معندكش قطع مضافة</td></tr>`}
             </tbody>
-            ${svb.items.length? `<tfoot><tr><td colspan="3">الإجمالي</td><td class="right num">${totalWeight.toFixed(3)}</td><td></td><td class="right num">${fmtCash(totalCash)}</td><td></td></tr></tfoot>`:''}
+            ${svb.items.length? `<tfoot><tr><td colspan="4">الإجمالي</td><td class="right num">${totalWeight.toFixed(3)}</td><td></td><td class="right num">${fmtCash(totalCash)}</td><td></td></tr></tfoot>`:''}
           </table>
         </div>
         <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
@@ -2048,6 +2065,9 @@ function renderSilverPurchaseBuilder(){
         </div>
         <div class="field"><label>المدفوع نقداً الآن</label><input type="text" inputmode="decimal" id="svb-paid" value="${totalCash.toFixed(2)}"></div>
         <div class="row">
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost" style="width:100%;" onclick="printSvbItemsQR()">🖶 طباعة QR القطع المحددة</button>
+          </div>
           ${svbEditId? `<div class="field" style="display:flex;align-items:flex-end;">
             <button class="btn btn-ghost" style="width:100%;color:#c0392b;border-color:#c0392b;" onclick="cancelSilverPurchaseBuilder()">🗑 حذف/إلغاء</button>
           </div>` : `<div class="field" style="display:flex;align-items:flex-end;">
@@ -2059,26 +2079,58 @@ function renderSilverPurchaseBuilder(){
         </div>
       </div>
       <div>
-        <div class="section-title" style="margin-top:0;">إضافة قطعة<div class="line"></div></div>
+        <div class="section-title" style="margin-top:0;">إضافة قطعة من الكتالوج<div class="line"></div></div>
         <div class="card" data-enter-scope>
-          <div class="field"><label>التصنيف</label>
-            <select id="svb-class">
-              <option value="">بدون</option>
-              ${state.classifications.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+          <div class="field"><label>الكود (الصنف / التصنيف / الفئة السعرية)</label>
+            <select id="svb-product" onchange="svbApplyProductPrice()">
+              <option value="">— اختار كود، أو استخدم التصنيف/الصنف تحت —</option>
+              ${state.products.map(p=>`<option value="${p.id}">${esc(p.code)} — ${esc(productLabel(p))}</option>`).join('')}
             </select>
           </div>
-          <div class="field"><label>الصنف</label>
-            <select id="svb-type">
-              <option value="">اختار الصنف</option>
-              ${state.itemTypes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}
-            </select>
+          <div class="row">
+            <div class="field"><label>التصنيف</label>
+              <select id="svb-class">
+                <option value="">بدون</option>
+                ${state.classifications.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label>الصنف</label>
+              <select id="svb-type">
+                <option value="">اختار الصنف</option>
+                ${state.itemTypes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+              </select>
+            </div>
           </div>
-          <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" id="svb-weight" placeholder="0.000"></div>
-          <div class="field"><label>سعر الجرام</label><input type="text" inputmode="decimal" id="svb-price" placeholder="0.00"></div>
+          <div class="row">
+            <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" id="svb-weight" placeholder="0.000"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addSvbLine();}"></div>
+            <div class="field"><label>سعر الجرام</label><input type="text" inputmode="decimal" id="svb-price" placeholder="0.00"></div>
+          </div>
           <button class="btn btn-gold" style="width:100%;" onclick="addSvbLine()" type="button" data-enter-submit>+ إضافة القطعة</button>
         </div>
       </div>
     </div>`;
+}
+function svbApplyProductPrice(){
+  const pid = document.getElementById('svb-product').value;
+  const prod = state.products.find(x=>x.id===pid);
+  if(!prod) return;
+  const classEl = document.getElementById('svb-class'); if(classEl) classEl.value = prod.classificationId||'';
+  const typeEl = document.getElementById('svb-type'); if(typeEl) typeEl.value = prod.itemTypeId||'';
+  const pc = state.priceCategories.find(x=>x.id===prod.priceCategoryId);
+  if(pc){ const priceEl = document.getElementById('svb-price'); if(priceEl) priceEl.value = Number(pc.price||0).toFixed(2); }
+}
+function toggleSvbSelectAll(checked){ svb.items.forEach(it=> it.selected = checked); render(); }
+function toggleSvbItemSelected(tempId, checked){
+  const it = svb.items.find(x=>x.tempId===tempId);
+  if(it) it.selected = checked;
+  render();
+}
+function printSvbItemsQR(){
+  if(!svb.items.length){ toast('لسه مفيش قطع مضافة'); return; }
+  const chosen = svb.items.filter(it=>it.selected!==false);
+  if(!chosen.length){ toast('حدد قطعة واحدة على الأقل'); return; }
+  showPieceQRModal(chosen);
 }
 function addSvbLine(){
   const classId = document.getElementById('svb-class').value || null;
@@ -2091,10 +2143,11 @@ function addSvbLine(){
   const t = state.itemTypes.find(x=>x.id===typeId);
   svb.items.push({
     tempId: uid('dft'), classificationId: classId, itemTypeId: typeId, itemName: t? t.name : 'صنف',
-    weight, price, lineTotal: weight*price, uid: newPieceUid(),
+    weight, price, lineTotal: weight*price, uid: newPieceUid(), selected: true,
     code: 'AG-'+String(state.counters.silverPiece + svb.items.length).padStart(5,'0')
   });
   ['svb-weight','svb-price'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const prodEl=document.getElementById('svb-product'); if(prodEl) prodEl.value='';
   render();
   const w=document.getElementById('svb-weight'); if(w) w.focus();
 }
@@ -2314,13 +2367,13 @@ function renderSilverCustomerSales(){
   const list = [...state.silverCustomerSales].sort((a,b)=>new Date(b.date)-new Date(a.date));
   return `
     <div class="pagehead">
-      <div><h1>بيع فضة لعميل</h1><p>بيع فضة بالوزن لعميل — بيتحصّل نقدي فورًا أو جزء والباقي على حسابه</p></div>
-      <button class="btn btn-gold" onclick="openSilverCustSaleModal()" ${state.customers.length?'':'disabled'}>+ فاتورة بيع فضة</button>
+      <div><h1>بيع فضة لعميل</h1><p>امسح باركود قطعة الفضة المكوّدة، أو سجّل بيع بالوزن يدويًا</p></div>
+      <button class="btn btn-gold" onclick="openScbBuilder()" ${state.customers.length?'':'disabled'}>+ فاتورة بيع فضة</button>
     </div>
     <div class="tbl-wrap">
       <table class="tl-table">
         <thead><tr><th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>العميل</th><th style="width:70px;">العيار</th>
-          <th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right total-col">الإجمالي</th><th class="right">المحصّل</th><th style="width:110px;"></th></tr></thead>
+          <th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right total-col">الإجمالي</th><th class="right">المحصّل</th><th style="width:150px;"></th></tr></thead>
         <tbody>
           ${list.length? list.map(s=>`
             <tr>
@@ -2333,7 +2386,8 @@ function renderSilverCustomerSales(){
               <td class="right total-col num" style="font-weight:700;color:var(--green);">${fmtCash(s.totalCash)}</td>
               <td class="right num">${fmtCash(s.paidNow||0)}</td>
               <td><div style="display:flex;gap:5px;justify-content:flex-end;">
-                <button class="btn btn-sm btn-ghost" onclick="openSilverCustSaleModal('${s.id}')">تعديل</button>
+                ${(s.pieceIds&&s.pieceIds.length)? `<button class="btn btn-sm btn-ghost" onclick="showPieceQRModal(${JSON.stringify(s.pieceIds)})">▣ QR</button>`:''}
+                <button class="btn btn-sm btn-ghost" onclick="editSilverCustSale('${s.id}')">تعديل</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteSilverCustSale('${s.id}')">حذف</button>
               </div></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="9">لسه مفيش فواتير بيع فضة لعملاء</td></tr>`}
@@ -2341,6 +2395,192 @@ function renderSilverCustomerSales(){
       </table>
     </div>`;
 }
+function editSilverCustSale(id){
+  const inv = state.silverCustomerSales.find(x=>x.id===id);
+  if(!inv) return;
+  if(inv.items && inv.items.length){ editScbBuilder(id); }
+  else { openSilverCustSaleModal(id); }
+}
+
+/* ---------- فاتورة بيع فضة لعميل (بناء متعدد القطع بمسح الباركود) ---------- */
+let scb = null;
+let scbEditId=null, scbEditNo=null, scbEditDate=null, scbEditCreatedAt=null;
+function resetScbBuilder(){ scb = { customerId:null, items: [] }; }
+function openScbBuilder(){
+  if(!state.customers.length){ toast('ضيف عميل الأول'); goto('customers'); return; }
+  scbEditId=null; scbEditNo=null; scbEditDate=null; scbEditCreatedAt=null;
+  resetScbBuilder();
+  goto('silver-customer-sale-builder');
+}
+function findSilverPieceByScan(code){
+  code = String(code||'').trim();
+  if(!code) return null;
+  let p = state.silverPieces.find(x=>x.uid===code);
+  if(p) return p;
+  p = state.silverPieces.find(x=>String(x.code)===code);
+  if(p) return p;
+  const asNo = parseInt(code,10);
+  if(!isNaN(asNo)) p = state.silverPieces.find(x=>Number(x.no)===asNo);
+  return p||null;
+}
+function addScbPieceByScan(){
+  const input = document.getElementById('scb-scan');
+  const raw = input? input.value : '';
+  const piece = findSilverPieceByScan(raw);
+  if(!piece){ toast('الباركود ده مش موجود في قطع الفضة'); if(input){input.value='';input.focus();} return; }
+  if(piece.sold){ toast('القطعة دي متباعة قبل كده'); if(input){input.value='';input.focus();} return; }
+  if(scb.items.some(x=>x.pieceId===piece.id)){ toast('القطعة دي مضافة بالفعل'); if(input){input.value='';input.focus();} return; }
+  scb.items.push({
+    pieceId: piece.id, no: piece.no, code: piece.code, itemName: pieceLabel(piece),
+    classificationId: piece.classificationId, karat: piece.karat, weight: piece.weight,
+    rate: 0, lineTotal: 0
+  });
+  if(input) input.value='';
+  refocusAfterRender('scb-scan');
+  render();
+}
+function setScbRate(pieceId, val){
+  const it = scb.items.find(x=>x.pieceId===pieceId);
+  if(!it) return;
+  it.rate = parseFloat(val)||0;
+  it.lineTotal = it.rate*it.weight;
+  render();
+}
+function removeScbLine(pieceId){ scb.items = scb.items.filter(x=>x.pieceId!==pieceId); refocusAfterRender('scb-scan'); render(); }
+function editScbBuilder(id){
+  const inv = state.silverCustomerSales.find(x=>x.id===id);
+  if(!inv) return;
+  scbEditId=inv.id; scbEditNo=inv.no; scbEditDate=inv.date; scbEditCreatedAt=inv.createdAt;
+  scb = {
+    customerId: inv.customerId,
+    items: (inv.items||[]).map(it=>({
+      pieceId: it.pieceId, no: it.no, code: it.code, itemName: it.itemName,
+      classificationId: it.classificationId, karat: it.karat, weight: it.weight,
+      rate: it.rate, lineTotal: it.lineTotal
+    }))
+  };
+  mutate(()=>{
+    revertScbInvoiceEffect(inv);
+    state.silverCustomerSales = state.silverCustomerSales.filter(x=>x.id!==id);
+  }, 'فتحت الفاتورة #'+inv.no+' للتعديل');
+  goto('silver-customer-sale-builder');
+}
+function renderScbBuilder(){
+  if(!scb) resetScbBuilder();
+  const c = customerById(scb.customerId);
+  const totalWeight = scb.items.reduce((s,i)=>s+i.weight,0);
+  const totalCash = scb.items.reduce((s,i)=>s+i.lineTotal,0);
+  return `
+    <div class="pagehead">
+      <div><h1>${scbEditId? 'تعديل فاتورة بيع فضة #'+scbEditNo : 'فاتورة بيع فضة لعميل'}</h1><p>امسح باركود قطعة الفضة المكوّدة واضغط Enter — الإجمالي = الوزن × سعر الجرام</p></div>
+      ${navBtn('silver-customer-sales','← رجوع لقائمة الفواتير')}
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="field"><label>العميل</label>
+        <select onchange="scb.customerId=this.value;render();">
+          <option value="">اختار العميل</option>
+          ${state.customers.map(x=>`<option value="${x.id}" ${scb.customerId===x.id?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}
+        </select>
+      </div>
+      ${c? `<div class="kv-inline" style="margin-top:10px;">
+        <span class="kv-chip">رصيد نقدي: <b style="color:${(c.balanceCash||0)>=0?'var(--green)':'var(--red)'};">${fmtCash(Math.abs(c.balanceCash||0))}</b></span>
+      </div>`:''}
+    </div>
+    <div class="card" style="margin-bottom:16px;padding:10px 14px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input id="scb-scan" placeholder="امسح باركود قطعة الفضة أو اكتب رقمها واضغط Enter..." autofocus
+          style="flex:1;min-width:220px;padding:7px 10px;font-size:13px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addScbPieceByScan();}">
+        <button class="btn btn-sm btn-gold" onclick="addScbPieceByScan()">+ إضافة</button>
+        <span class="kv-chip">قطع: <b>${scb.items.length}</b></span>
+        <span class="kv-chip">وزن: <b>${totalWeight.toFixed(3)} جم</b></span>
+        <span class="kv-chip">إجمالي: <b>${fmtCash(totalCash)}</b></span>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-bottom:16px;">
+      <table class="tl-table">
+        <thead><tr><th style="width:60px;">م</th><th>الكود</th><th>الصنف</th><th style="width:70px;">العيار</th>
+          <th class="right" style="width:100px;">الوزن</th><th style="width:130px;">سعر الجرام</th><th class="right total-col">الإجمالي</th><th style="width:50px;"></th></tr></thead>
+        <tbody>
+          ${scb.items.length? scb.items.map((it,idx)=>`
+            <tr>
+              <td class="mono muted">${idx+1}</td>
+              <td class="mono">${esc(it.code)}</td>
+              <td>${esc(it.itemName)}</td>
+              <td class="muted">ع${it.karat}</td>
+              <td class="right num">${it.weight.toFixed(3)}</td>
+              <td><input type="text" inputmode="decimal" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setScbRate('${it.pieceId}',this.value)"></td>
+              <td class="right total-col num" style="font-weight:700;color:var(--navy);">${fmtCash(it.lineTotal)}</td>
+              <td><span class="rm" style="display:inline-block;" onclick="removeScbLine('${it.pieceId}')">✕</span></td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">امسح باركود القطعة عشان تنزل هنا</td></tr>`}
+        </tbody>
+        ${scb.items.length? `<tfoot><tr><td colspan="4">الإجمالي</td><td class="right num">${totalWeight.toFixed(3)}</td><td></td><td class="right total-col num">${fmtCash(totalCash)}</td><td></td></tr></tfoot>`:''}
+      </table>
+    </div>
+    <div class="row">
+      <div class="field"><label>المحصّل نقداً الآن</label><input type="text" inputmode="decimal" id="scb-paid" value="${totalCash.toFixed(2)}"></div>
+      <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
+        ${scb.items.length? `<button class="btn btn-ghost" onclick="showPieceQRModal(${JSON.stringify(scb.items.map(i=>i.pieceId))})" type="button">🖶 طباعة QR</button>`:''}
+        <button class="btn btn-ghost" onclick="cancelScbBuilder()" type="button">إلغاء</button>
+        <button class="btn btn-gold" style="width:100%;" onclick="submitScbBuilder()">${scbEditId?'حفظ التعديل':'حفظ الفاتورة'}</button>
+      </div>
+    </div>`;
+}
+function cancelScbBuilder(){
+  if(!scb.items.length){ scb=null; scbEditId=null; goto('silver-customer-sales'); return; }
+  showConfirmModal('إلغاء الفاتورة دي؟'+(scbEditId? ' الفاتورة القديمة اتلغت بالفعل ومش هترجع غير لو حفظت تاني.':''), ()=>{
+    scb=null; scbEditId=null; scbEditNo=null; scbEditDate=null; scbEditCreatedAt=null;
+    closeModal(); goto('silver-customer-sales');
+  }, {confirmLabel:'إلغاء', danger:true});
+}
+function revertScbInvoiceEffect(inv){
+  const c = customerById(inv.customerId);
+  state.treasury.silver[inv.purity] = (Number(state.treasury.silver[inv.purity])||0) + inv.weight;
+  state.treasury.cash -= (inv.paidNow||0);
+  if(c) c.balanceCash -= ((inv.totalCash||0) - (inv.paidNow||0));
+  (inv.items||[]).forEach(it=>{
+    const p = state.silverPieces.find(x=>x.id===it.pieceId);
+    if(p) p.sold=false;
+  });
+}
+function submitScbBuilder(){
+  if(!scb.customerId){ toast('اختار العميل'); return; }
+  if(!scb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
+  const totalWeight = scb.items.reduce((s,i)=>s+i.weight,0);
+  const totalCash = scb.items.reduce((s,i)=>s+i.lineTotal,0);
+  let paid = parseFloat(document.getElementById('scb-paid').value)||0;
+  paid = Math.max(0, Math.min(paid, totalCash));
+  const items = scb.items.slice();
+  const customerId = scb.customerId;
+  const editing = !!scbEditId;
+  const purity = items[0]? items[0].karat : (state.silverPurities||DEFAULT_SILVER_PURITIES)[0];
+  let savedId = null, pieceIds=[];
+  mutate(()=>{
+    const c = customerById(customerId);
+    items.forEach(it=>{
+      state.treasury.silver[it.karat] = (Number(state.treasury.silver[it.karat])||0) - it.weight;
+      const p = state.silverPieces.find(x=>x.id===it.pieceId);
+      if(p) p.sold=true;
+      pieceIds.push(it.pieceId);
+    });
+    state.treasury.cash += paid;
+    c.balanceCash += (totalCash - paid);
+    savedId = editing? scbEditId : uid('scs');
+    const rec = {
+      id: savedId, no: editing? scbEditNo : state.counters.silverCustSale++,
+      date: editing? (scbEditDate||todayStr()) : todayStr(),
+      createdAt: editing? scbEditCreatedAt : new Date().toISOString(),
+      customerId, purity, weight: totalWeight, pricePerGram: totalWeight? totalCash/totalWeight : 0,
+      totalCash, paidNow: paid, pieceIds,
+      items: items.map(it=>({pieceId:it.pieceId, no:it.no, code:it.code, itemName:it.itemName,
+        classificationId:it.classificationId, karat:it.karat, weight:it.weight, rate:it.rate, lineTotal:it.lineTotal}))
+    };
+    state.silverCustomerSales.push(rec);
+  }, editing? 'تم حفظ التعديل' : 'تم حفظ فاتورة بيع الفضة');
+  scb=null; scbEditId=null; scbEditNo=null; scbEditDate=null; scbEditCreatedAt=null;
+  goto('silver-customer-sales');
+}
+
 function openSilverCustSaleModal(editId){
   silverCustSaleEditId = editId || null;
   const ed = silverCustSaleEditId? state.silverCustomerSales.find(x=>x.id===silverCustSaleEditId) : null;
@@ -2422,7 +2662,11 @@ function deleteSilverCustSale(id){
   const s = state.silverCustomerSales.find(x=>x.id===id);
   if(!s) return;
   showConfirmModal('حذف فاتورة بيع الفضة #'+(s.no||'')+'؟ هيرجع الوزن للخزينة ويتلغي قيدها على حساب العميل.', ()=>{
-    mutate(()=>{ revertSilverCustSaleEffect(s); state.silverCustomerSales = state.silverCustomerSales.filter(x=>x.id!==id); }, 'تم حذف الفاتورة');
+    mutate(()=>{
+      revertSilverCustSaleEffect(s);
+      (s.pieceIds||[]).forEach(pid=>{ const p = state.silverPieces.find(x=>x.id===pid); if(p) p.sold=false; });
+      state.silverCustomerSales = state.silverCustomerSales.filter(x=>x.id!==id);
+    }, 'تم حذف الفاتورة');
     closeModal();
   }, {confirmLabel:'حذف الفاتورة', danger:true});
 }
