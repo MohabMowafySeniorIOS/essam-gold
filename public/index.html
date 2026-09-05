@@ -316,7 +316,7 @@
   .report-sheet table.rep-table .amt{font-variant-numeric:tabular-nums;text-align:right;}
   .report-sheet .rep-empty{text-align:center;color:#999;padding:34px;font-size:13px;}
 
-  .report-sheet .rep-totals{display:flex;justify-content:flex-start;margin-top:16px;}
+  .report-sheet .rep-totals{display:flex;justify-content:flex-end;margin-bottom:16px;}
   .report-sheet .rep-totbox{display:flex;flex-direction:column;gap:4px;}
   .report-sheet .rep-totrow{display:flex;align-items:center;gap:10px;}
   .report-sheet .rep-totrow > span{order:2;width:95px;font-size:13px;color:#444;text-align:right;}
@@ -603,7 +603,7 @@ const COUNTERS_DEF = { merchant:1, customer:1, purchase:1, sale:1, pending:1, se
   itemType:1, classification:1, priceCategory:1, product:1, piece:1,
   lot:1, custSale:1, custReturn:1, merReturn:1, mfg:1, mfgPiece:90001, square:1,
   scrapSale:1, scrapAdj:1,
-  silverPurchase:1, silverSale:1, silverCustSale:1,
+  silverPurchase:1, silverSale:1, silverCustSale:1, silverPiece:1,
   pieceUid:1 };
 
 /* ============================= الكود الفريد للقطعة (QR) =============================
@@ -727,6 +727,7 @@ function defaultState(){
     silverPurchases: [],
     silverSales: [],
     silverCustomerSales: [],
+    silverPieces: [],
     counters: Object.assign({}, COUNTERS_DEF)
   };
 }
@@ -777,6 +778,7 @@ async function loadState(){
       if(!state.silverPurchases) state.silverPurchases=[];
       if(!state.silverSales) state.silverSales=[];
       if(!state.silverCustomerSales) state.silverCustomerSales=[];
+      if(!state.silverPieces) state.silverPieces=[];
       (state.merchants||[]).forEach(m=>{ if(!m.balanceSilver) m.balanceSilver = emptySilverMap(); });
       if(!Array.isArray(state.pieceUidRegistry)) state.pieceUidRegistry = [];
       _uidSet = null; _uidSetLen = -1;
@@ -1049,12 +1051,14 @@ const NAV = [
     {id:'rep-returns', label:'تقرير فواتير المرتجعات', icon:'📕'},
     {id:'rep-purchases', label:'تقرير المشتريات من التجار', icon:'📘'},
     {id:'rep-pieces', label:'تقرير مخزون القطع', icon:'📦'},
+    {id:'gold-stocktake', label:'جرد الذهب', icon:'📋'},
     {id:'rep-profit', label:'تقرير أرباح المحل', icon:'💹'},
     {id:'year-closing', label:'تقفيل ميزان سنوي', icon:'📅'},
   ]},
   {group:'الفضة', icon:'⚪', items:[
     {id:'silver-summary', label:'أرصدة الفضة', icon:'≡'},
     {id:'silver-purchases', label:'شراء فضة من تاجر', icon:'↙'},
+    {id:'silver-pieces', label:'باركود الفضة', icon:'▥'},
     {id:'silver-sales', label:'بيع فضة لتاجر', icon:'↗'},
     {id:'silver-customer-sales', label:'بيع فضة لعميل', icon:'🧾'},
   ]},
@@ -1296,11 +1300,14 @@ function render(){
     'rep-returns': renderReturnsReport,
     'rep-purchases': renderPurchasesReport,
     'rep-pieces': renderPiecesReport,
+    'gold-stocktake': renderGoldStocktake,
     'rep-profit': renderProfitReport,
     'year-closing': renderYearClosing,
     'users': renderUsers,
     'silver-summary': renderSilverSummary,
     'silver-purchases': renderSilverPurchases,
+    'silver-purchase-builder': renderSilverPurchaseBuilder,
+    'silver-pieces': renderSilverPiecesBarcode,
     'silver-sales': renderSilverSales,
     'silver-customer-sales': renderSilverCustomerSales,
     'system-code': renderSystemCode,
@@ -1309,11 +1316,30 @@ function render(){
     'thermal-template': renderThermalTemplateEditor,
   };
   main.innerHTML = renderers[currentView] ? renderers[currentView]() : '<p>غير موجود</p>';
+  applyEditDeletePermission();
   if(pendingFocusId){
     const id = pendingFocusId; pendingFocusId = null;
     const el = document.getElementById(id);
     if(el){ el.focus(); try{ const len=el.value.length; el.setSelectionRange(len,len); }catch(e){} }
   }
+}
+function userCanEditDelete(){
+  if(!currentUser) return true; // قبل ما نظام الدخول يتفعّل، سيبها متاحة عادي
+  if(currentUser.role==='super') return true;
+  return currentUser.canEditDelete!==false;
+}
+/* بتدور جوه الصفحة الحالية بس (مش الشريط) على أي زرار "تعديل"/"حذف" وتخفيه لو المستخدم مالوش صلاحية */
+function applyEditDeletePermission(){
+  if(userCanEditDelete()) return;
+  const root = document.getElementById('main');
+  if(!root) return;
+  root.querySelectorAll('button, a, span').forEach(el=>{
+    if(el.dataset.editPermChecked) return;
+    const txt = (el.textContent||'').trim();
+    const isDanger = el.classList && el.classList.contains('btn-danger');
+    const looksEditDelete = /تعديل|حذف|تصفير الرصيد|تسوية/.test(txt) && txt.length<40;
+    if(isDanger || looksEditDelete){ el.style.display='none'; }
+  });
 }
 let pendingFocusId = null;
 function refocusAfterRender(id){ pendingFocusId = id; }
@@ -1424,6 +1450,13 @@ function renderCashReport(){
   return `
   <div class="section-title" style="margin-top:28px;">تقرير حسابات النقدية<div class="line"></div></div>
   <div class="report-sheet">
+    <div class="rep-totals">
+      <div class="rep-totbox">
+        <div class="rep-totrow"><span>اجمالي مدين</span><b>${fmtNum2(totalIn)}</b></div>
+        <div class="rep-totrow"><span>اجمالي دائن</span><b>${fmtNum2(totalOut)}</b></div>
+        <div class="rep-totrow"><span>الرصيد</span><b>${fmtNum2(closing)}</b></div>
+      </div>
+    </div>
     <div class="rep-filters">
       <div class="rep-frow"><label>من تاريخ</label><input type="date" value="${esc(from)}" onchange="repSet('repFrom',this.value)"></div>
       <div class="rep-frow"><label>الي تاريخ</label><input type="date" value="${esc(to)}" onchange="repSet('repTo',this.value)"></div>
@@ -1475,13 +1508,6 @@ function renderCashReport(){
       </tbody>
     </table>
 
-    <div class="rep-totals">
-      <div class="rep-totbox">
-        <div class="rep-totrow"><span>اجمالي مدين</span><b>${fmtNum2(totalIn)}</b></div>
-        <div class="rep-totrow"><span>اجمالي دائن</span><b>${fmtNum2(totalOut)}</b></div>
-        <div class="rep-totrow"><span>الرصيد</span><b>${fmtNum2(closing)}</b></div>
-      </div>
-    </div>
   </div>`;
 }
 
@@ -1814,12 +1840,12 @@ function renderSilverPurchases(){
   return `
     <div class="pagehead">
       <div><h1>شراء فضة من تاجر</h1><p>شراء فضة بالوزن من تاجر — الوزن يتقيد في رصيد فضة التاجر (ليه علينا)، والباقي من الثمن يتقيد نقديًا</p></div>
-      <button class="btn btn-gold" onclick="openSilverPurchaseModal()" ${state.merchants.length?'':'disabled'}>+ فاتورة شراء فضة</button>
+      <button class="btn btn-gold" onclick="openSilverPurchaseBuilder()" ${state.merchants.length?'':'disabled'}>+ فاتورة شراء فضة</button>
     </div>
     <div class="tbl-wrap">
       <table class="tl-table">
         <thead><tr><th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>التاجر</th><th style="width:70px;">العيار</th>
-          <th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right total-col">الإجمالي</th><th class="right">المدفوع</th><th style="width:110px;"></th></tr></thead>
+          <th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right total-col">الإجمالي</th><th class="right">المدفوع</th><th style="width:170px;"></th></tr></thead>
         <tbody>
           ${list.length? list.map(s=>`
             <tr>
@@ -1832,7 +1858,8 @@ function renderSilverPurchases(){
               <td class="right total-col num" style="font-weight:700;color:var(--navy);">${fmtCash(s.totalCash)}</td>
               <td class="right num">${fmtCash(s.paidNow||0)}</td>
               <td><div style="display:flex;gap:5px;justify-content:flex-end;">
-                <button class="btn btn-sm btn-ghost" onclick="openSilverPurchaseModal('${s.id}')">تعديل</button>
+                ${(s.pieceIds&&s.pieceIds.length)? `<button class="btn btn-sm btn-ghost" onclick="showPieceQRModal(${JSON.stringify(s.pieceIds)})">▣ QR</button>`:''}
+                <button class="btn btn-sm btn-ghost" onclick="editSilverPurchase('${s.id}')">تعديل</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteSilverPurchase('${s.id}')">حذف</button>
               </div></td>
             </tr>`).join('') : `<tr class="empty-row"><td colspan="9">لسه مفيش فواتير شراء فضة</td></tr>`}
@@ -1920,10 +1947,243 @@ function submitSilverPurchase(){
 function deleteSilverPurchase(id){
   const s = state.silverPurchases.find(x=>x.id===id);
   if(!s) return;
-  showConfirmModal('حذف فاتورة شراء الفضة #'+(s.no||'')+'؟ هيترجع الوزن من الخزينة ويتلغي قيدها على حساب التاجر.', ()=>{
-    mutate(()=>{ revertSilverPurchaseEffect(s); state.silverPurchases = state.silverPurchases.filter(x=>x.id!==id); }, 'تم حذف الفاتورة');
+  showConfirmModal('حذف فاتورة شراء الفضة #'+(s.no||'')+'؟ هيترجع الوزن من الخزينة ويتلغي قيدها على حساب التاجر، والقطع بتاعتها هتتشال.', ()=>{
+    mutate(()=>{
+      revertSilverPurchaseEffect(s);
+      if(s.pieceIds && s.pieceIds.length) state.silverPieces = state.silverPieces.filter(p=>!s.pieceIds.includes(p.id));
+      state.silverPurchases = state.silverPurchases.filter(x=>x.id!==id);
+    }, 'تم حذف الفاتورة');
     closeModal();
   }, {confirmLabel:'حذف الفاتورة', danger:true});
+}
+function editSilverPurchase(id){
+  const inv = state.silverPurchases.find(x=>x.id===id);
+  if(!inv) return;
+  if(inv.items && inv.items.length){ editSilverPurchaseBuilder(id); }
+  else { openSilverPurchaseModal(id); }
+}
+
+/* ---------- فاتورة شراء فضة من تاجر (بناء متعدد القطع + ترميز QR) ---------- */
+let svb = null;
+let svbEditId=null, svbEditNo=null, svbEditDate=null, svbEditCreatedAt=null;
+function resetSilverPurchaseBuilder(){
+  svb = { merchantId: null, purity: (state.silverPurities||DEFAULT_SILVER_PURITIES)[0], items: [] };
+}
+function openSilverPurchaseBuilder(){
+  if(!state.merchants.length){ toast('ضيف تاجر الأول'); goToAddMerchant(); return; }
+  svbEditId=null; svbEditNo=null; svbEditDate=null; svbEditCreatedAt=null;
+  resetSilverPurchaseBuilder();
+  goto('silver-purchase-builder');
+}
+function editSilverPurchaseBuilder(id){
+  const inv = state.silverPurchases.find(x=>x.id===id);
+  if(!inv) return;
+  svbEditId=inv.id; svbEditNo=inv.no; svbEditDate=inv.date; svbEditCreatedAt=inv.createdAt;
+  svb = {
+    merchantId: inv.merchantId, purity: inv.purity,
+    items: (inv.items||[]).map(it=>{
+      const pc = it.pieceId? state.silverPieces.find(x=>x.id===it.pieceId) : null;
+      return { tempId: uid('dft'), classificationId: it.classificationId||null, itemTypeId: it.itemTypeId,
+        itemName: it.itemName, code: it.code, weight: it.weight, price: it.price, lineTotal: it.lineTotal!=null? it.lineTotal : it.weight*it.price,
+        uid: pc? pc.uid : newPieceUid() };
+    })
+  };
+  mutate(()=>{
+    revertSilverPurchaseEffect(inv);
+    if(inv.pieceIds && inv.pieceIds.length) state.silverPieces = state.silverPieces.filter(p=>!inv.pieceIds.includes(p.id));
+    state.silverPurchases = state.silverPurchases.filter(x=>x.id!==id);
+  }, 'فتحت الفاتورة #'+inv.no+' للتعديل');
+  goto('silver-purchase-builder');
+}
+function renderSilverPurchaseBuilder(){
+  if(!svb) resetSilverPurchaseBuilder();
+  const purities = state.silverPurities||DEFAULT_SILVER_PURITIES;
+  const totalWeight = svb.items.reduce((s,i)=>s+i.weight,0);
+  const totalCash = svb.items.reduce((s,i)=>s+i.lineTotal,0);
+  return `
+    <div class="pagehead">
+      <div><h1>${svbEditId? 'تعديل فاتورة شراء فضة #'+svbEditNo : 'فاتورة شراء فضة من تاجر'}</h1>
+        <p>ضيف كل قطعة فضة بوزنها وسعرها لوحدها — كل قطعة بتاخد كود فريد وQR خاص بيها وتدخل مخزون الفضة</p></div>
+      ${navBtn('silver-purchases','← رجوع لقائمة الفواتير')}
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="row">
+        <div class="field"><label>التاجر</label>
+          <select onchange="svb.merchantId=this.value;render();">
+            <option value="">اختار التاجر</option>
+            ${state.merchants.map(m=>`<option value="${m.id}" ${svb.merchantId===m.id?'selected':''}>${esc(m.name)} (${esc(m.code)})</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>عيار الفضة (للفاتورة كلها)</label>
+          <select onchange="svb.purity=parseFloat(this.value);render();">
+            ${purities.map(p=>`<option value="${p}" ${svb.purity===p?'selected':''}>عيار ${p}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;">
+      <div>
+        <div class="section-title" style="margin-top:0;">القطع المضافة في الفاتورة<div class="line"></div></div>
+        <div class="tbl-wrap" style="margin-bottom:12px;">
+          <table>
+            <thead><tr><th>التصنيف</th><th>الصنف</th><th>الكود</th><th class="right">الوزن</th><th class="right">سعر الجرام</th><th class="right">الإجمالي</th><th></th></tr></thead>
+            <tbody>
+              ${svb.items.length? svb.items.map((it,idx)=>`
+                <tr>
+                  <td class="muted">${esc(classificationName(it.classificationId)||'—')}</td>
+                  <td>${esc(it.itemName)}</td>
+                  <td class="mono" style="font-size:11.5px;">${esc(it.code)}</td>
+                  <td class="right num">${it.weight.toFixed(3)}</td>
+                  <td class="right num">${fmtCash(it.price)}</td>
+                  <td class="right num" style="font-weight:700;color:var(--navy);">${fmtCash(it.lineTotal)}</td>
+                  <td><span class="rm" style="display:inline-block;" onclick="removeSvbLine('${it.tempId}')">✕</span></td>
+                </tr>`).join('') : `<tr class="empty-row"><td colspan="7">لسه معندكش قطع مضافة</td></tr>`}
+            </tbody>
+            ${svb.items.length? `<tfoot><tr><td colspan="3">الإجمالي</td><td class="right num">${totalWeight.toFixed(3)}</td><td></td><td class="right num">${fmtCash(totalCash)}</td><td></td></tr></tfoot>`:''}
+          </table>
+        </div>
+        <div class="card" style="margin-bottom:12px;font-size:12.5px;color:var(--muted);line-height:1.7;">
+          عند الحفظ: <b style="color:var(--gold-bright);">${totalWeight.toFixed(3)} جم</b> فضة عيار ${svb.purity} هتدخل مخزون الخزينة وتتقيد على رصيد التاجر (ليه علينا)،
+          و<b style="color:var(--gold-bright);">${fmtCash(totalCash)}</b> هيتقيد نقديًا حسب المدفوع دلوقتي. كل قطعة هتاخد كود فريد وQR خاص بيها.
+        </div>
+        <div class="field"><label>المدفوع نقداً الآن</label><input type="text" inputmode="decimal" id="svb-paid" value="${totalCash.toFixed(2)}"></div>
+        <div class="row">
+          ${svbEditId? `<div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost" style="width:100%;color:#c0392b;border-color:#c0392b;" onclick="cancelSilverPurchaseBuilder()">🗑 حذف/إلغاء</button>
+          </div>` : `<div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost" style="width:100%;" onclick="cancelSilverPurchaseBuilder()">إلغاء</button>
+          </div>`}
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-gold" style="width:100%;" onclick="submitSilverPurchaseBuilder()">${svbEditId?'حفظ التعديل':'حفظ الفاتورة'}</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title" style="margin-top:0;">إضافة قطعة<div class="line"></div></div>
+        <div class="card" data-enter-scope>
+          <div class="field"><label>التصنيف</label>
+            <select id="svb-class">
+              <option value="">بدون</option>
+              ${state.classifications.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>الصنف</label>
+            <select id="svb-type">
+              <option value="">اختار الصنف</option>
+              ${state.itemTypes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>الوزن (جم)</label><input type="text" inputmode="decimal" id="svb-weight" placeholder="0.000"></div>
+          <div class="field"><label>سعر الجرام</label><input type="text" inputmode="decimal" id="svb-price" placeholder="0.00"></div>
+          <button class="btn btn-gold" style="width:100%;" onclick="addSvbLine()" type="button" data-enter-submit>+ إضافة القطعة</button>
+        </div>
+      </div>
+    </div>`;
+}
+function addSvbLine(){
+  const classId = document.getElementById('svb-class').value || null;
+  const typeId = document.getElementById('svb-type').value;
+  const weight = parseFloat(document.getElementById('svb-weight').value)||0;
+  const price = parseFloat(document.getElementById('svb-price').value)||0;
+  if(!typeId){ toast('اختار الصنف'); return; }
+  if(weight<=0){ toast('اكتب الوزن'); return; }
+  if(price<=0){ toast('اكتب سعر الجرام'); return; }
+  const t = state.itemTypes.find(x=>x.id===typeId);
+  svb.items.push({
+    tempId: uid('dft'), classificationId: classId, itemTypeId: typeId, itemName: t? t.name : 'صنف',
+    weight, price, lineTotal: weight*price, uid: newPieceUid(),
+    code: 'AG-'+String(state.counters.silverPiece + svb.items.length).padStart(5,'0')
+  });
+  ['svb-weight','svb-price'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  render();
+  const w=document.getElementById('svb-weight'); if(w) w.focus();
+}
+function removeSvbLine(tempId){ svb.items = svb.items.filter(x=>x.tempId!==tempId); render(); }
+function cancelSilverPurchaseBuilder(){
+  if(!svb.items.length){ svb=null; svbEditId=null; goto('silver-purchases'); return; }
+  showConfirmModal('إلغاء الفاتورة دي وكل القطع اللي ضفتها؟ '+(svbEditId? 'الفاتورة القديمة اتلغت بالفعل ومش هترجع غير لو حفظت تاني.':''), ()=>{
+    svb=null; svbEditId=null; svbEditNo=null; svbEditDate=null; svbEditCreatedAt=null;
+    closeModal(); goto('silver-purchases');
+  }, {confirmLabel:'إلغاء', danger:true});
+}
+function submitSilverPurchaseBuilder(){
+  if(!svb.merchantId){ toast('اختار التاجر'); return; }
+  if(!svb.items.length){ toast('ضيف قطعة واحدة على الأقل'); return; }
+  const totalWeight = svb.items.reduce((s,i)=>s+i.weight,0);
+  const totalCash = svb.items.reduce((s,i)=>s+i.lineTotal,0);
+  let paid = parseFloat(document.getElementById('svb-paid').value)||0;
+  paid = Math.max(0, Math.min(paid, totalCash));
+  const items = svb.items.slice();
+  const purity = svb.purity;
+  const merchantId = svb.merchantId;
+  const editing = !!svbEditId;
+  const invId = editing? svbEditId : uid('svp');
+  let pieceIds = [];
+  mutate(()=>{
+    const m = merchantById(merchantId);
+    state.treasury.silver[purity] = (Number(state.treasury.silver[purity])||0) + totalWeight;
+    m.balanceSilver[purity] = (Number(m.balanceSilver[purity])||0) - totalWeight;
+    state.treasury.cash -= paid;
+    m.balanceCash -= (totalCash - paid);
+    const invItems = items.map(it=>{
+      const pieceId = uid('svpc');
+      pieceIds.push(pieceId);
+      state.silverPieces.push({
+        id: pieceId, uid: it.uid, no: state.counters.silverPiece++, date: todayStr(),
+        invoiceId: invId, merchantId, itemTypeId: it.itemTypeId, classificationId: it.classificationId,
+        karat: purity, weight: it.weight, code: it.code, sold:false
+      });
+      return {pieceId, classificationId:it.classificationId, itemTypeId:it.itemTypeId, itemName:it.itemName,
+        code: it.code, weight: it.weight, price: it.price, lineTotal: it.lineTotal};
+    });
+    const rec = {
+      id: invId,
+      no: editing? svbEditNo : state.counters.silverPurchase++,
+      date: editing? (svbEditDate||todayStr()) : todayStr(),
+      createdAt: editing? svbEditCreatedAt : new Date().toISOString(),
+      merchantId, purity, weight: totalWeight, pricePerGram: totalWeight? totalCash/totalWeight : 0,
+      totalCash, paidNow: paid, items: invItems, pieceIds
+    };
+    state.silverPurchases.push(rec);
+  }, editing? 'تم حفظ التعديل' : 'تم حفظ فاتورة شراء الفضة');
+  svb = null; svbEditId=null; svbEditNo=null; svbEditDate=null; svbEditCreatedAt=null;
+  goto('silver-purchases');
+  if(pieceIds.length) setTimeout(()=>showPieceQRModal(pieceIds), 150);
+}
+
+/* ---------- باركود الفضة (قائمة القطع المكودة) ---------- */
+function renderSilverPiecesBarcode(){
+  const list = [...state.silverPieces].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const totalStock = list.filter(p=>!p.sold).reduce((s,p)=>s+p.weight,0);
+  return `
+    <div class="pagehead">
+      <div><h1>باركود الفضة</h1><p>كل قطع الفضة المكوّدة — امسح الكيو آر لأي فاتورة بيع أو تحرك</p></div>
+    </div>
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${list.length}</div></div>
+      <div class="card stat"><div class="label"><span>في المخزن</span></div><div class="value">${list.filter(p=>!p.sold).length}</div></div>
+      <div class="card stat"><div class="label"><span>إجمالي الوزن المتاح</span></div><div class="value">${totalStock.toFixed(3)} <small>جم</small></div></div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tl-table">
+        <thead><tr><th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
+          <th style="width:70px;">العيار</th><th class="right">الوزن</th><th style="width:90px;">الحالة</th><th style="width:110px;"></th></tr></thead>
+        <tbody>
+          ${list.length? list.map(p=>`
+            <tr>
+              <td class="mono muted">#${p.no}</td>
+              <td class="muted num">${fmtDateRep(p.date)}</td>
+              <td class="mono">${esc(p.code)}</td>
+              <td>${esc(pieceLabel(p))}</td>
+              <td class="muted">${esc(classificationName(p.classificationId)||'—')}</td>
+              <td class="muted">ع${p.karat}</td>
+              <td class="right num">${Number(p.weight).toFixed(3)}</td>
+              <td><span class="pill ${p.sold?'pill-muted':'pill-green'}">${p.sold?'مباعة':'في المخزن'}</span></td>
+              <td><button class="btn btn-sm btn-gold" onclick="showPieceQRModal(['${p.id}'])">▣ QR</button></td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="9">لسه مفيش قطع فضة متكودة</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 /* ---------- بيع فضة لتاجر ---------- */
@@ -3442,7 +3702,7 @@ function pieceQRLabelHTML(p){
 }
 /* بتاخد إما مصفوفة ids (قطع محفوظة) أو مصفوفة كائنات قطعة جاهزة (زي عناصر فاتورة لسه مسودة) */
 function resolvePiecesArg(idsOrPieces){
-  return (idsOrPieces||[]).map(x=> (typeof x==='string')? state.pieces.find(p=>p.id===x) : x).filter(Boolean);
+  return (idsOrPieces||[]).map(x=> (typeof x==='string')? (state.pieces.find(p=>p.id===x) || (state.silverPieces||[]).find(p=>p.id===x)) : x).filter(Boolean);
 }
 function printPieceQRs(idsOrPieces){
   const pieces = resolvePiecesArg(idsOrPieces);
@@ -4167,7 +4427,8 @@ function renderInvoiceList(kind){
             : `<span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع كامل':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>`;
           const hrs = invoiceHoursLeft(inv);
           const sold = invoiceSoldPieces(inv);
-          const canChange = isPurchase && hrs>0 && sold===0;
+          const isSuper = currentUser && currentUser.role==='super';
+          const canChange = isPurchase && sold===0 && (hrs>0 || isSuper);
           const why = hrs<=0? 'عدّى أكتر من ٢٤ ساعة' : (sold? invoicePieceLockReason(inv):'');
           return `
           <tr class="${canChange?'row-editable':''}" ${canChange? `ondblclick="editPurchaseInvoice('${inv.id}')" title="دوس مرتين عشان تفتح الفاتورة للتعديل"` : (isPurchase? `title="مقفولة · ${esc(why)}"` : '')}>
@@ -4186,8 +4447,10 @@ function renderInvoiceList(kind){
                 ${canChange? `
                   <button class="btn btn-sm btn-ghost" onclick="editPurchaseInvoice('${inv.id}')">تعديل</button>
                   <button class="btn btn-sm btn-danger" onclick="deletePurchaseInvoice('${inv.id}')">حذف</button>
-                  <span class="muted" style="font-size:10.5px;align-self:center;">${Math.floor(hrs)} س</span>
-                ` : `<span class="muted" style="font-size:11px;">مقفولة · ${esc(why)}</span>`}
+                  ${hrs>0? `<span class="muted" style="font-size:10.5px;align-self:center;">${Math.floor(hrs)} س</span>` : `<span class="pill pill-gold" style="align-self:center;">سوبر يوزر</span>`}
+                ` : (sold? `<span class="muted" style="font-size:11px;">مقفولة · ${esc(why)}</span>`
+                        : `<button class="btn btn-sm btn-ghost" onclick="editPurchaseInvoice('${inv.id}')" title="متاح للسوبر يوزر بس">✎ تعديل (سوبر يوزر)</button>
+                           <button class="btn btn-sm btn-danger" onclick="deletePurchaseInvoice('${inv.id}')" title="متاح للسوبر يوزر بس">حذف (سوبر يوزر)</button>`)}
               </div>
             </td>`:''}
           </tr>`;
@@ -4556,7 +4819,8 @@ function tryReopenInvoice(kind, id){
   const inv = invoiceBucket(kind).find(x=>x.id===id);
   if(!inv) return;
   if(!invoiceWithinWindow(inv)){
-    promptSuperPassword('فتح الفاتورة للتعديل', ()=> reopenInvoice(kind, id));
+    if(currentUser && currentUser.role==='super'){ reopenInvoice(kind, id); return; }
+    toast('عدّى أكتر من ٢٤ ساعة على الفاتورة — التعديل متاح بس للسوبر يوزر');
     return;
   }
   reopenInvoice(kind, id);
@@ -4601,7 +4865,8 @@ function guardInvoiceChange(inv, action, onGranted){
     return;
   }
   if(invoiceWithinWindow(inv)){ onGranted(); return; }
-  promptSuperPassword(action, onGranted);
+  if(currentUser && currentUser.role==='super'){ onGranted(); return; }
+  toast('عدّى أكتر من ٢٤ ساعة على الفاتورة — '+action+' متاح بس للسوبر يوزر. سجّل دخول بحساب السوبر يوزر عشان تكمل.');
 }
 
 function deletePurchaseInvoice(id){
@@ -4995,6 +5260,7 @@ function pieceLabel(piece){
   return '—';
 }
 function pieceCode(piece){
+  if(piece.code) return piece.code;
   const prod = piece.productId? state.products.find(x=>x.id===piece.productId) : null;
   return prod? prod.code : '—';
 }
@@ -6092,7 +6358,7 @@ function openLotModal(dir, editId){
           <div class="field"><label>وزن القطع (جم)</label><input type="text" inputmode="decimal" step="0.001" id="lot-weight" value="${l? l.weight:''}" placeholder="0.000" oninput="recalcLot()"></div>
         </div>
         <div class="row">
-          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="text" inputmode="decimal" step="0.01" id="lot-price" value="${l? l.pricePerGram21 : (((dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT))||'')&&(dir==='buy'? goldBuyPrice(BASE_KARAT) : goldSellPrice(BASE_KARAT)).toFixed(2))}" placeholder="0.00" oninput="recalcLot()"></div>
+          <div class="field"><label>سعر الجرام (عيار ${BASE_KARAT})</label><input type="text" inputmode="decimal" step="0.01" id="lot-price" value="${l? l.pricePerGram21 : ''}" placeholder="0.00" oninput="recalcLot()"></div>
           <div class="field"><label>الوزن المحوّل لعيار ${BASE_KARAT}</label><input id="lot-w21" readonly value="0.000" style="font-weight:800;color:var(--navy);"></div>
         </div>
         <div class="row">
@@ -6626,11 +6892,17 @@ function renderCustomerSaleBuilder(){
   const totalAll = csbEffectiveTotal();
   const price21 = (csb.price21!=null && csb.price21!=='')? Number(csb.price21) : Number(goldCfg().sell21||0);
   const available = state.pieces.filter(p=>!p.sold).length;
+  const belowMinItems = csb.items.filter(it=> it.rate < csbMinRate(it) - 0.0001);
   return `
     <div class="pagehead">
       <div><h1>فاتورة مبيعات لعميل</h1><p>امسح باركود القطعة (أو اكتب رقمها) واضغط Enter — الإجمالي = (سعر جرام الذهب + أجر الجرام) × الوزن، والفاتورة بتطلع بكيو آر كود</p></div>
       ${navBtn('customer-sales','← رجوع لقائمة الفواتير')}
     </div>
+
+    ${belowMinItems.length? `<div class="card" style="margin-bottom:16px;border-color:var(--red);background:var(--red-bg);">
+      <div style="font-weight:800;color:var(--red);margin-bottom:4px;">⚠ مينفعش تحفظ الفاتورة دلوقتي</div>
+      <div style="font-size:12.5px;color:var(--red);">أجر الجرام لـ${belowMinItems.length} قطعة أقل من سعر البيع المحدد لها وقت التكويد. عدّل الأجر في الجدول (محدد باللون الأحمر) قبل ما تقدر تحفظ أو تطبع.</div>
+    </div>` : ''}
 
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
@@ -6654,20 +6926,17 @@ function renderCustomerSaleBuilder(){
       </div>`:''}
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <label>امسح الباركود هنا</label>
-      <div style="display:flex;gap:10px;">
+    <div class="card" style="margin-bottom:16px;padding:10px 14px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <input id="csb-scan" placeholder="امسح الباركود أو اكتب رقم القطعة واضغط Enter..." autofocus
+          style="flex:1;min-width:220px;padding:7px 10px;font-size:13px;"
           onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomerSalePieceByScan();}">
-        <button class="btn btn-gold" style="white-space:nowrap;" onclick="addCustomerSalePieceByScan()">+ إضافة القطعة</button>
+        <button class="btn btn-sm btn-gold" style="white-space:nowrap;" onclick="addCustomerSalePieceByScan()">+ إضافة</button>
+        <span class="kv-chip">قطع: <b>${csb.items.length}</b></span>
+        <span class="kv-chip">وزن: <b>${totalWeight.toFixed(3)} جم</b></span>
+        <span class="kv-chip">ذهب: <b>${fmtCash(totalGoldValue)}</b></span>
+        <span class="kv-chip">أجر: <b>${fmtCash(totalMaking)}</b></span>
       </div>
-    </div>
-
-    <div class="grid grid-4" style="margin-bottom:16px;">
-      <div class="card stat"><div class="label"><span>عدد القطع</span></div><div class="value">${csb.items.length}</div></div>
-      <div class="card stat"><div class="label"><span>إجمالي وزن الذهب</span></div><div class="value">${totalWeight.toFixed(3)} <small>جم</small></div></div>
-      <div class="card stat"><div class="label"><span>قيمة الذهب</span></div><div class="value">${fmtCash(totalGoldValue)}</div></div>
-      <div class="card stat"><div class="label"><span>إجمالي الأجر</span></div><div class="value">${fmtCash(totalMaking)}</div></div>
     </div>
     <div class="card" style="margin-bottom:16px;border-color:var(--navy);">
       <div class="grid grid-3" style="align-items:flex-end;">
@@ -6718,7 +6987,7 @@ function renderCustomerSaleBuilder(){
               <td class="muted">عيار ${it.karat}</td>
               <td><input type="text" inputmode="decimal" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
               <td><input type="text" inputmode="decimal" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
-              <td><input type="text" inputmode="decimal" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;${it.rate<csbMinRate(it)-0.0001?'border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:700;':''}" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
               <td class="total-col">
                 <input type="text" inputmode="decimal" step="0.01" value="${Number(it.lineTotal||0).toFixed(2)}"
                   style="padding:6px 8px;font-size:13px;font-weight:800;color:var(--navy);text-align:left;"
@@ -6798,6 +7067,12 @@ function addCustomerInline(){
 function submitCustomerSale(){
   if(!csb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
   if(!csb.customerId){ toast('اختر العميل الأول من فوق'); return; }
+  const belowItems = csb.items.filter(it=> it.rate < csbMinRate(it) - 0.0001);
+  if(belowItems.length){
+    const names = belowItems.map(it=> esc(it.itemName)+' (أدنى '+csbMinRate(it).toFixed(2)+', المكتوب '+Number(it.rate).toFixed(2)+')').join(' — ');
+    toast('مينفعش تحفظ — أجر الجرام لـ'+belowItems.length+' قطعة أقل من سعر البيع المحدد لها: '+names);
+    return;
+  }
   const totalWeight = csb.items.reduce((s,i)=>s+i.weight,0);
   const totalMaking = csb.items.reduce((s,i)=>s+i.making,0);
   const totalGoldValue = csb.items.reduce((s,i)=>s+(i.goldValue||0),0);
@@ -7499,6 +7774,85 @@ function renderPurchasesReport(){
 }
 
 /* ---------- تقرير مخزون القطع ---------- */
+/* ---------- جرد الذهب ---------- */
+function renderGoldStocktake(){
+  const karatF = uiState.stkKarat||'';
+  const classF = uiState.stkClass||'';
+  const typeF = uiState.stkType||'';
+  const rows = state.pieces.filter(p=>{
+    if(p.sold || p.returned) return false;
+    if(karatF && String(p.karat)!==String(karatF)) return false;
+    if(classF && p.classificationId!==classF) return false;
+    if(typeF && p.itemTypeId!==typeF) return false;
+    return true;
+  }).sort((a,b)=> new Date(b.date)-new Date(a.date));
+
+  const totalWeight = rows.reduce((s,p)=>s+(Number(p.weight)||0),0);
+  const totalWeight21 = rows.reduce((s,p)=>s+to21(p.weight,p.karat),0);
+  const isFullInventory = !karatF && !classF && !typeF;
+
+  return `
+    <div class="pagehead">
+      <div><h1>جرد الذهب</h1><p>حدد العيار و/أو التصنيف و/أو الصنف عشان تجرد جزء معين، أو سيبهم كلهم فاضيين عشان تجرد المحل بالكامل</p></div>
+      <button class="btn" onclick="printReportEl('stk-table','جرد الذهب')">🖶 طباعة</button>
+    </div>
+
+    <div class="filterbar">
+      <div class="fb-row">
+        <div class="f"><span>العيار</span>
+          <select onchange="uiState.stkKarat=this.value;render();">
+            <option value="">كل الأعيرة</option>
+            ${state.karats.map(k=>`<option value="${k}" ${String(karatF)===String(k)?'selected':''}>عيار ${k}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f"><span>التصنيف</span>
+          <select onchange="uiState.stkClass=this.value;render();">
+            <option value="">كل التصنيفات</option>
+            ${state.classifications.map(c=>`<option value="${c.id}" ${classF===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f"><span>الصنف</span>
+          <select onchange="uiState.stkType=this.value;render();">
+            <option value="">كل الأصناف</option>
+            ${state.itemTypes.map(t=>`<option value="${t.id}" ${typeF===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f auto"><span>&nbsp;</span><button class="btn btn-ghost btn-sm" onclick="uiState.stkKarat='';uiState.stkClass='';uiState.stkType='';render();">↺ مسح الفلاتر</button></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;${isFullInventory?'border-color:var(--gold-bright);':''}">
+      <div style="font-weight:800;margin-bottom:2px;color:${isFullInventory?'var(--gold-bright)':'var(--text)'};">
+        ${isFullInventory? '📋 جرد شامل — كل قطع المحل' : '📋 جرد جزئي — حسب الفلاتر المحددة فوق'}
+      </div>
+      <div class="muted" style="font-size:12.5px;">عدد القطع في هذا الجرد: <b>${rows.length}</b> — الوزن الفعلي: <b>${totalWeight.toFixed(3)} جم</b> — الوزن بعيار ${BASE_KARAT}: <b style="color:var(--gold-bright);">${totalWeight21.toFixed(3)} جم</b></div>
+    </div>
+
+    <div class="tbl-wrap" id="stk-table">
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
+          <th style="width:70px;">العيار</th><th class="right total-col" style="width:100px;">الوزن</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length? rows.map(p=>`
+            <tr>
+              <td class="mono muted">#${p.no}</td>
+              <td class="muted num">${fmtDateRep(p.date)}</td>
+              <td class="mono" style="font-size:11.5px;">${esc(p.barcodeValue||tagBarcodeValue(p))}</td>
+              <td class="mono">${esc(pieceCode(p))}</td>
+              <td>${esc(pieceLabel(p))}</td>
+              <td class="muted">${esc(classificationName(p.classificationId)||'—')}</td>
+              <td class="muted">ع${p.karat}</td>
+              <td class="right total-col num" style="font-weight:700;">${Number(p.weight||0).toFixed(3)}</td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لا توجد قطع مطابقة لمعايير الجرد</td></tr>`}
+        </tbody>
+        ${rows.length? `<tfoot><tr><td colspan="7">الإجمالي</td><td class="right total-col num">${totalWeight.toFixed(3)}</td></tr></tfoot>`:''}
+      </table>
+    </div>
+  `;
+}
+
 function renderPiecesReport(){
   const clsF = uiState.repPieceClass||'';
   const karatF = uiState.repPieceKarat||'';
@@ -8928,9 +9282,9 @@ function renderSquares(){
         <div class="sq-f"><span>عيار</span>
           <select id="sq-karat">${state.karats.map(k=>`<option value="${k}" ${karat===k?'selected':''}>${k}</option>`).join('')}</select>
         </div>
-        <div class="sq-f"><span>الوزن</span><input type="text" inputmode="decimal" step="0.001" id="sq-weight" placeholder="0.000" oninput="sqRecalc()"></div>
-        <div class="sq-f"><span>السعر</span><input type="text" inputmode="decimal" step="0.01" id="sq-price" placeholder="0.00" oninput="sqRecalc()"></div>
-        <div class="sq-f"><span>الإجمالي</span><input id="sq-total" readonly class="sq-ro" value="0.00"></div>
+        <input type="text" inputmode="decimal" step="0.001" id="sq-weight" style="display:none;" oninput="sqRecalc()">
+        <input type="text" inputmode="decimal" step="0.01" id="sq-price" style="display:none;" oninput="sqRecalc()">
+        <input id="sq-total" readonly style="display:none;" value="0.00">
         <div class="sq-f grow"><span>كود المرتجع أو المردود</span>
           <input id="sq-retcode" placeholder="ادخل كود المرتجع أو المردود"
             onkeydown="if(event.key==='Enter'){event.preventDefault();sqAdd();}"></div>
@@ -9509,10 +9863,10 @@ function userCanAccess(navId){
   return (currentUser.permissions||[]).includes(navId);
 }
 function saveSession(userId){
-  try{ sessionStorage.setItem('essamGoldUserId', userId); }catch(e){}
+  try{ localStorage.setItem('essamGoldUserId', userId); }catch(e){}
 }
 function clearSession(){
-  try{ sessionStorage.removeItem('essamGoldUserId'); }catch(e){}
+  try{ localStorage.removeItem('essamGoldUserId'); }catch(e){}
 }
 function logoutUser(){
   currentUser = null;
@@ -9520,6 +9874,15 @@ function logoutUser(){
   currentView = 'home';
   boot();
 }
+/* لو حصل تسجيل دخول أو خروج في تاب تاني لنفس المتصفح، التاب ده يتزامن معاه تلقائي */
+window.addEventListener('storage', (e)=>{
+  if(e.key!=='essamGoldUserId') return;
+  if(!e.newValue){ currentUser = null; currentView='home'; boot(); return; }
+  if(!currentUser || currentUser.id!==e.newValue){
+    const u = state.users.find(x=>x.id===e.newValue);
+    if(u && u.active!==false){ currentUser = u; boot(); }
+  }
+});
 /* ============================= شاشة الإعداد الأولى (أول سوبر يوزر) ============================= */
 function renderSetupSuperUserScreen(){
   document.body.innerHTML = `
@@ -9553,7 +9916,7 @@ function createSuperUser(){
   if(!username){ setErr('اكتب اسم مستخدم'); return; }
   if(pass.length<4){ setErr('كلمة المرور لازم تكون 4 حروف/أرقام على الأقل'); return; }
   if(pass!==pass2){ setErr('كلمتين المرور مش متطابقتين'); return; }
-  const user = {id:uid('user'), username, name, passwordHash:simpleHash(pass), role:'super', permissions:[...ALL_PERM_IDS], active:true, createdAt:new Date().toISOString()};
+  const user = {id:uid('user'), username, name, passwordHash:simpleHash(pass), role:'super', permissions:[...ALL_PERM_IDS], canEditDelete:true, active:true, createdAt:new Date().toISOString()};
   state.users.push(user);
   persist();
   currentUser = user;
@@ -9638,7 +10001,7 @@ function openUserModal(editId){
         <div class="row">
           <div class="field"><label>${ed?'كلمة مرور جديدة (سيبها فاضية لو مش هتغيرها)':'كلمة المرور'}</label><input type="password" id="um-pass" placeholder="${ed?'••••••':''}"></div>
           <div class="field"><label>الدور</label>
-            <select id="um-role" onchange="document.getElementById('um-perms-wrap').style.display=this.value==='super'?'none':'block';">
+            <select id="um-role" onchange="const s=this.value==='super';document.getElementById('um-perms-wrap').style.display=s?'none':'block';document.getElementById('um-editdel-wrap').style.display=s?'none':'block';">
               <option value="user" ${!isSuper?'selected':''}>مستخدم محدود الصلاحيات</option>
               <option value="super" ${isSuper?'selected':''}>سوبر يوزر (كل الصلاحيات)</option>
             </select>
@@ -9650,6 +10013,12 @@ function openUserModal(editId){
             <option value="1" ${ed&&ed.active===false?'':'selected'}>شغال</option>
             <option value="0" ${ed&&ed.active===false?'selected':''}>متوقف (مش هيقدر يدخل)</option>
           </select>
+        </div>
+        <div class="field" id="um-editdel-wrap" style="display:${isSuper?'none':'block'};">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="um-canedit" ${(!ed || ed.canEditDelete!==false)?'checked':''}>
+            يقدر يعدّل أو يحذف بيانات (فواتير، مستخدمين، أي حاجة متسجلة) — لو مطفي، يقدر يشوف ويضيف بس
+          </label>
         </div>
         <div id="um-perms-wrap" style="display:${isSuper?'none':'block'};">
           <div class="section-title" style="margin-top:10px;">الصفحات المسموح له يدخلها<div class="line"></div></div>
@@ -9682,6 +10051,7 @@ function saveUser(editId){
   const pass = document.getElementById('um-pass').value||'';
   const role = document.getElementById('um-role').value;
   const active = document.getElementById('um-active').value==='1';
+  const canEditDelete = document.getElementById('um-canedit').checked;
   const permEls = document.querySelectorAll('.um-perm:checked');
   const permissions = Array.from(permEls).map(x=>x.value);
   if(!username){ toast('اكتب اسم مستخدم'); return; }
@@ -9691,11 +10061,13 @@ function saveUser(editId){
   mutate(()=>{
     if(editId){
       const u = state.users.find(x=>x.id===editId);
-      Object.assign(u, {username, name, role, active, permissions: role==='super'? [...ALL_PERM_IDS] : permissions});
+      Object.assign(u, {username, name, role, active, canEditDelete: role==='super'? true : canEditDelete,
+        permissions: role==='super'? [...ALL_PERM_IDS] : permissions});
       if(pass.length>=4) u.passwordHash = simpleHash(pass);
       if(currentUser && currentUser.id===u.id) currentUser = u;
     } else {
       state.users.push({id:uid('user'), username, name, passwordHash:simpleHash(pass), role, active,
+        canEditDelete: role==='super'? true : canEditDelete,
         permissions: role==='super'? [...ALL_PERM_IDS] : permissions, createdAt:new Date().toISOString()});
     }
   }, editId? 'تم حفظ التعديل' : 'تم إنشاء المستخدم');
@@ -9718,7 +10090,7 @@ function boot(){
   }
   if(!currentUser){
     let savedId = null;
-    try{ savedId = sessionStorage.getItem('essamGoldUserId'); }catch(e){}
+    try{ savedId = localStorage.getItem('essamGoldUserId'); }catch(e){}
     const u = savedId? state.users.find(x=>x.id===savedId) : null;
     if(u && u.active!==false){ currentUser = u; }
     else { renderLoginScreen(); return; }
