@@ -8019,21 +8019,55 @@ function renderPurchasesReport(){
 
 /* ---------- تقرير مخزون القطع ---------- */
 /* ---------- جرد الذهب ---------- */
+let stkScanned = {}; // {pieceId: true} — القطع اللي اتجردت في الجلسة الحالية
+function stkFilters(){
+  return { karatF: uiState.stkKarat||'', classF: uiState.stkClass||'', typeF: uiState.stkType||'' };
+}
+function stkMatchesFilter(p){
+  const {karatF, classF, typeF} = stkFilters();
+  if(karatF && String(p.karat)!==String(karatF)) return false;
+  if(classF && p.classificationId!==classF) return false;
+  if(typeF && p.itemTypeId!==typeF) return false;
+  return true;
+}
+function stkReset(){
+  showConfirmModal('تصفير الجرد الحالي وابدأ من جديد؟ كل القطع اللي اتجردت هترجع "لسه" تاني.', ()=>{
+    stkScanned = {};
+    closeModal();
+    render();
+  }, {confirmLabel:'تصفير الجرد'});
+}
+function stkScan(){
+  const input = document.getElementById('stk-scan');
+  const raw = input? input.value : '';
+  const piece = findPieceByScan(raw);
+  if(!piece){ toast('❌ الباركود ده مش موجود في قطع الذهب'); if(input){input.value='';input.focus();} return; }
+  if(piece.sold || piece.returned){ toast('❌ القطعة دي مش في المخزن (مباعة أو مترجعة)'); if(input){input.value='';input.focus();} return; }
+  if(!stkMatchesFilter(piece)){
+    toast('❌ القطعة دي مش من ضمن الجرد ده — الصنف/التصنيف/العيار بتاعها مختلف عن الفلتر المحدد');
+    if(input){input.value='';input.focus();}
+    return;
+  }
+  const already = !!stkScanned[piece.id];
+  stkScanned[piece.id] = true;
+  if(input) input.value='';
+  refocusAfterRender('stk-scan');
+  toast(already? '↺ القطعة دي كانت متجردة بالفعل' : '✅ تم جرد قطعة: '+pieceLabel(piece)+' ('+Number(piece.weight).toFixed(3)+' جم)');
+  render();
+}
 function renderGoldStocktake(){
-  const karatF = uiState.stkKarat||'';
-  const classF = uiState.stkClass||'';
-  const typeF = uiState.stkType||'';
+  const {karatF, classF, typeF} = stkFilters();
   const rows = state.pieces.filter(p=>{
     if(p.sold || p.returned) return false;
-    if(karatF && String(p.karat)!==String(karatF)) return false;
-    if(classF && p.classificationId!==classF) return false;
-    if(typeF && p.itemTypeId!==typeF) return false;
-    return true;
+    return stkMatchesFilter(p);
   }).sort((a,b)=> new Date(b.date)-new Date(a.date));
 
   const totalWeight = rows.reduce((s,p)=>s+(Number(p.weight)||0),0);
   const totalWeight21 = rows.reduce((s,p)=>s+to21(p.weight,p.karat),0);
   const isFullInventory = !karatF && !classF && !typeF;
+  const scannedRows = rows.filter(p=>stkScanned[p.id]);
+  const missingRows = rows.filter(p=>!stkScanned[p.id]);
+  const scannedWeight21 = scannedRows.reduce((s,p)=>s+to21(p.weight,p.karat),0);
 
   return `
     <div class="pagehead">
@@ -8069,18 +8103,35 @@ function renderGoldStocktake(){
       <div style="font-weight:800;margin-bottom:2px;color:${isFullInventory?'var(--gold-bright)':'var(--text)'};">
         ${isFullInventory? '📋 جرد شامل — كل قطع المحل' : '📋 جرد جزئي — حسب الفلاتر المحددة فوق'}
       </div>
-      <div class="muted" style="font-size:12.5px;">عدد القطع في هذا الجرد: <b>${rows.length}</b> — الوزن الفعلي: <b>${totalWeight.toFixed(3)} جم</b> — الوزن بعيار ${BASE_KARAT}: <b style="color:var(--gold-bright);">${totalWeight21.toFixed(3)} جم</b></div>
+      <div class="muted" style="font-size:12.5px;">عدد القطع المطلوب جردها: <b>${rows.length}</b> — الوزن الفعلي: <b>${totalWeight.toFixed(3)} جم</b> — الوزن بعيار ${BASE_KARAT}: <b style="color:var(--gold-bright);">${totalWeight21.toFixed(3)} جم</b></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;padding:10px 14px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input id="stk-scan" placeholder="امسح باركود القطعة المجرودة أو اكتب رقمها واضغط Enter..." autofocus
+          style="flex:1;min-width:240px;padding:8px 10px;font-size:13.5px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();stkScan();}">
+        <button class="btn btn-gold" onclick="stkScan()" type="button">+ جرد</button>
+        <button class="btn btn-ghost btn-sm" onclick="stkReset()" type="button">↺ تصفير الجرد</button>
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="card stat"><div class="label"><span>اتجرد</span></div><div class="value" style="color:var(--green);">${scannedRows.length} <small>من ${rows.length}</small></div></div>
+      <div class="card stat"><div class="label"><span>لسه هيتجرد</span></div><div class="value" style="color:${missingRows.length?'var(--red)':'var(--green)'};">${missingRows.length}</div></div>
+      <div class="card stat"><div class="label"><span>الوزن اللي اتجرد (ع${BASE_KARAT})</span></div><div class="value">${scannedWeight21.toFixed(3)} <small>جم</small></div></div>
     </div>
 
     <div class="tbl-wrap" id="stk-table">
       <table class="tl-table">
         <thead><tr>
-          <th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
+          <th style="width:70px;">الحالة</th><th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
           <th style="width:70px;">العيار</th><th class="right total-col" style="width:100px;">الوزن</th>
         </tr></thead>
         <tbody>
           ${rows.length? rows.map(p=>`
-            <tr>
+            <tr style="${stkScanned[p.id]?'background:var(--green-bg);':''}">
+              <td>${stkScanned[p.id]? '<span class="pill pill-green">✓ اتجرد</span>' : '<span class="pill pill-muted">لسه</span>'}</td>
               <td class="mono muted">#${p.no}</td>
               <td class="muted num">${fmtDateRep(p.date)}</td>
               <td class="mono" style="font-size:11.5px;">${esc(p.barcodeValue||tagBarcodeValue(p))}</td>
@@ -8089,9 +8140,9 @@ function renderGoldStocktake(){
               <td class="muted">${esc(classificationName(p.classificationId)||'—')}</td>
               <td class="muted">ع${p.karat}</td>
               <td class="right total-col num" style="font-weight:700;">${Number(p.weight||0).toFixed(3)}</td>
-            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لا توجد قطع مطابقة لمعايير الجرد</td></tr>`}
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="9">لا توجد قطع مطابقة لمعايير الجرد</td></tr>`}
         </tbody>
-        ${rows.length? `<tfoot><tr><td colspan="7">الإجمالي</td><td class="right total-col num">${totalWeight.toFixed(3)}</td></tr></tfoot>`:''}
+        ${rows.length? `<tfoot><tr><td colspan="8">الإجمالي</td><td class="right total-col num">${totalWeight.toFixed(3)}</td></tr></tfoot>`:''}
       </table>
     </div>
   `;
