@@ -732,6 +732,7 @@ function defaultState(){
   };
 }
 
+let stateLoaded = false;
 async function loadState(){
   try{
     const r = await fetch('/api/state');
@@ -782,16 +783,34 @@ async function loadState(){
       (state.merchants||[]).forEach(m=>{ if(!m.balanceSilver) m.balanceSilver = emptySilverMap(); });
       if(!Array.isArray(state.pieceUidRegistry)) state.pieceUidRegistry = [];
       _uidSet = null; _uidSetLen = -1;
+      stateLoaded = true;
       if(ensurePieceUids()) setTimeout(()=>persist(), 300);
     } else {
+      // السيرفر رد بس مفيهوش state خالص — ده أول تشغيل حقيقي للسيستم، مش فشل تحميل
       state = defaultState();
+      stateLoaded = true;
     }
   }catch(e){
-    console.error('load failed, starting fresh', e);
-    state = defaultState();
+    // فشل الاتصال بالسيرفر — ما تمسحش الداتا الموجودة ولا تفتح البرنامج على حالة فاضية،
+    // عشان أي حفظ بعد كده كان هيدمر كل الداتا الحقيقية المحفوظة على السيرفر
+    console.error('load failed — keeping app locked to protect saved data', e);
+    stateLoaded = false;
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#141414;padding:20px;">
+        <div style="background:#fff;border-radius:14px;padding:32px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);">
+          <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+          <h2 style="margin:0 0 10px;font-family:'Almarai',sans-serif;color:#c0392b;">تعذر تحميل البيانات</h2>
+          <p style="color:var(--muted);font-size:13.5px;line-height:1.7;margin-bottom:18px;">
+            مقدرناش نوصل للسيرفر أو نجيب بياناتك المحفوظة. عشان محافظين على أمان البيانات، البرنامج مش هيفتح دلوقتي —
+            كده مش هيحصل خطر إن أي حاجة تتمسح أو تتستبدل بالغلط. اتأكد من اتصال الإنترنت وإن السيرفر شغال، وجرب تاني.
+          </p>
+          <button class="btn btn-gold" onclick="location.reload()">🔄 إعادة المحاولة</button>
+        </div>
+      </div>`;
   }
 }
 let saveTimer=null;
+let saveDirty=false;
 let saveIndicatorTimer=null;
 function setSaveIndicator(text){
   const el = document.getElementById('save-indicator');
@@ -801,6 +820,11 @@ function setSaveIndicator(text){
   if(text) saveIndicatorTimer = setTimeout(()=>{ el.textContent=''; }, 1600);
 }
 function persist(){
+  if(!stateLoaded){
+    console.error('رفضنا نحفظ — البيانات لسه متحملتش صح من السيرفر، وحفظ دلوقتي كان ممكن يدمر بيانات حقيقية');
+    return;
+  }
+  saveDirty = true;
   clearTimeout(saveTimer);
   setSaveIndicator('جارِ الحفظ...');
   saveTimer=setTimeout(async ()=>{
@@ -811,6 +835,7 @@ function persist(){
         body: JSON.stringify(state)
       });
       if(!r.ok) throw new Error('save failed: '+r.status);
+      saveDirty = false;
       setSaveIndicator('تم الحفظ ✓');
     }catch(e){
       console.error('save failed', e);
@@ -818,6 +843,16 @@ function persist(){
     }
   }, 250);
 }
+/* لو المستخدم قفل التاب أو نقل صفحة وفيه حفظ لسه مستني، ابعته فورًا بدل ما يضيع */
+window.addEventListener('beforeunload', ()=>{
+  if(!stateLoaded || !saveDirty) return;
+  clearTimeout(saveTimer);
+  try{
+    const blob = new Blob([JSON.stringify(state)], {type:'application/json'});
+    navigator.sendBeacon('/api/state', blob);
+    saveDirty = false;
+  }catch(e){}
+});
 function mutate(fn, msg){
   fn();
   persist();
@@ -891,16 +926,16 @@ function code128SVG(text, opts){
 /* ============================= HELPERS ============================= */
 function fmtCash(n){
   n = Number(n)||0;
-  const s = Math.abs(n).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const s = Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   return (n<0?'-':'') + s + ' جنيه';
 }
 function fmtW(n){
   n = Number(n)||0;
-  return n.toLocaleString('ar-EG',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' جم';
+  return n.toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' جم';
 }
 function fmtDate(d){
   const dt = new Date(d);
-  return dt.toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'});
+  return dt.toLocaleDateString('ar-EG-u-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit'});
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function merchantById(id){ return state.merchants.find(m=>m.id===id); }
@@ -1007,7 +1042,6 @@ const NAV = [
     ]},
     {id:'journal', label:'اليومية', icon:'🗓'},
     {id:'dashboard', label:'الخزينة', icon:'◆'},
-    {id:'manufacture', label:'التصنيع', icon:'⚒'},
   ]},
   {group:'الكسر', icon:'⛃', items:[
     {id:'scrap-ledger', label:'نظرة عامة', icon:'⛃'},
@@ -1015,6 +1049,7 @@ const NAV = [
     {id:'scrap-sell', label:'بيع دهب كسر', icon:'⬆'},
     {id:'scrap-settle', label:'تسوية الكسر', icon:'⚖'},
     {id:'scrap-losses', label:'خسائر الكسر', icon:'📉'},
+    {id:'manufacture', label:'التصنيع', icon:'⚒'},
   ]},
   {group:'الأصناف', icon:'▤', items:[
     {id:'catalog', label:'الأصناف والمنتجات', icon:'▤'},
@@ -3168,6 +3203,7 @@ function renderCatalogListTab(tabKey){
   const cfg = CATALOG_LISTS[tabKey];
   const list = state[cfg.key];
   const isClass = tabKey==='classifications';
+  const isItems = tabKey==='items';
   return `
     <div class="card" style="margin-bottom:16px;" data-enter-scope>
       <label>${esc(cfg.singular)} جديد</label>
@@ -3176,12 +3212,14 @@ function renderCatalogListTab(tabKey){
         <button class="btn btn-gold" style="white-space:nowrap;" data-enter-submit onclick="addCatalogEntry('${tabKey}')">+ إضافة</button>
       </div>
       ${isClass? `<div class="hint" style="margin-top:8px;">كل تصنيف بياخد <b>باركود خاص بيه</b> تلقائيًا، وبيدخل في باركود القطع المصنّعة.</div>`:''}
+      ${isItems? `<div class="hint" style="margin-top:8px;">علّم الصنف بـ"غير مكود" لو بيتشترى بالوزن والعدد سوا (زي الدبل والقطع الصغيرة) من غير ما كل قطعة تاخد كود QR لوحدها.</div>`:''}
     </div>
     <div class="tbl-wrap">
       <table>
         <thead><tr>
           <th>${esc(cfg.title)}</th>
           ${isClass? '<th style="width:130px;">باركود التصنيف</th>':''}
+          ${isItems? '<th style="width:110px;">غير مكود</th>':''}
           <th style="width:170px;"></th>
         </tr></thead>
         <tbody>
@@ -3189,15 +3227,25 @@ function renderCatalogListTab(tabKey){
           <tr>
             <td style="font-weight:700;">${esc(x.name)}</td>
             ${isClass? `<td class="mono" style="letter-spacing:1px;">${esc(x.barcode||'—')}</td>`:''}
+            ${isItems? `<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" ${x.uncoded?'checked':''} onchange="toggleItemTypeUncoded('${x.id}',this.checked)">
+              <span class="pill ${x.uncoded?'pill-gold':'pill-muted'}">${x.uncoded?'غير مكود':'مكود'}</span>
+            </label></td>`:''}
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-gold" onclick="openEditCatalogModal('${tabKey}','${x.id}')">تعديل</button>
               <button class="btn btn-sm btn-danger" onclick="deleteCatalogEntry('${tabKey}','${x.id}')">حذف</button>
             </div></td>
-          </tr>`).join('') : `<tr class="empty-row"><td colspan="${isClass?3:2}">لا توجد عناصر بعد</td></tr>`}
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="${isClass||isItems?3:2}">لا توجد عناصر بعد</td></tr>`}
         </tbody>
       </table>
     </div>
   `;
+}
+function toggleItemTypeUncoded(id, checked){
+  mutate(()=>{
+    const it = state.itemTypes.find(x=>x.id===id);
+    if(it) it.uncoded = !!checked;
+  }, checked? 'الصنف بقى غير مكود' : 'الصنف بقى مكود عادي');
 }
 function openEditCatalogModal(tabKey, id){
   const cfg = CATALOG_LISTS[tabKey];
@@ -3939,8 +3987,8 @@ function pieceQRLabelHTML(p){
     <div class="qr-label-txt">
       <div class="qr-shop">${esc(shopName())}</div>
       <div class="qr-uid">${esc(i.uid)}</div>
-      <div class="qr-line">${esc(i.name)} · ${esc(i.classification)}</div>
-      <div class="qr-line">عيار ${i.karat} · ${i.weight.toFixed(3)} جم</div>
+      <div class="qr-line">${esc(i.name)} · ${esc(i.classification)}${p.uncoded&&p.qty>1? ' · العدد '+p.qty : ''}</div>
+      <div class="qr-line">عيار ${i.karat} · ${i.weight.toFixed(3)} جم${p.uncoded&&p.qty>1? ' إجمالي' : ''}</div>
     </div>
   </div>`;
 }
@@ -4880,7 +4928,7 @@ function renderPBItemsRows(){
       <td><input type="checkbox" ${it.selected!==false?'checked':''} onchange="togglePBItemSelected('${it.tempId}',this.checked)"></td>
       <td>${esc(it.classificationName)}</td>
       <td class="mono">${esc(it.code)}</td>
-      <td>${esc(it.itemName)}</td>
+      <td>${esc(it.itemName)}${it.uncoded&&it.qty>1? ` <span class="pill pill-gold" style="font-size:10px;">×${it.qty}</span>` : ''}</td>
       <td class="num muted">${fmtCash(it.price)}</td>
       <td class="num">${it.weight.toFixed(3)} جم</td>
       <td class="right num" style="font-weight:700;color:var(--gold-bright);">${fmtCash(it.making||0)}</td>
@@ -4897,17 +4945,29 @@ function renderPBAddForm(){
   const it = state.itemTypes.find(x=>x.id===product.itemTypeId);
   const cl = state.classifications.find(x=>x.id===product.classificationId);
   const pc = state.priceCategories.find(x=>x.id===product.priceCategoryId);
+  const uncoded = it && it.uncoded;
   return `
     <div class="kv-inline" style="margin-bottom:12px;">
       <span class="kv-chip">الكود: <b>${esc(product.code)}</b></span>
       <span class="kv-chip">الصنف: <b>${esc(it?it.name:'—')}</b></span>
       <span class="kv-chip">التصنيف: <b>${esc(cl?cl.name:'—')}</b></span>
       <span class="kv-chip">أجر الجرام: <b>${fmtCash(pc?pc.price||0:0)}</b></span>
+      ${uncoded? `<span class="kv-chip" style="border-color:var(--gold-bright);color:var(--gold-bright);">غير مكود — بالوزن والعدد</span>`:''}
     </div>
+    ${uncoded? `
+    <div class="row">
+      <div class="field"><label>الوزن الإجمالي (جم)</label>
+        <input type="text" inputmode="decimal" step="0.001" id="pb-weight" placeholder="0.000"></div>
+      <div class="field"><label>العدد (قطعة) — Enter للإضافة</label>
+        <input type="text" inputmode="decimal" step="1" id="pb-qty" placeholder="1" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}"></div>
+    </div>
+    <div class="hint" style="margin:-6px 0 12px;">هتتضاف سطر واحد بكود QR واحد يمثّل العدد والوزن كله سوا (مش لكل قطعة كود لوحدها)</div>
+    ` : `
     <div class="field"><label>الوزن (جم) — Enter للإضافة</label>
       <input type="text" inputmode="decimal" step="0.001" id="pb-weight" placeholder="0.000" onkeydown="if(event.key==='Enter'){event.preventDefault();addPBLine();}">
     </div>
     <div class="hint" style="margin:-6px 0 12px;">الأجر بيتحسب تلقائيًا: الوزن × أجر الجرام (${fmtCash(pc?pc.price||0:0)})</div>
+    `}
     <button class="btn btn-sm btn-gold" onclick="addPBLine()" type="button">+ إضافة للفاتورة</button>
   `;
 }
@@ -5012,15 +5072,24 @@ function addPBLine(){
   const price = pc? (pc.price||0) : 0;
   const serial = pb.serialCursor++;
   const barcodeValue = buildBarcodeValue(pb.karat, weight, serial);
+  const uncoded = it && it.uncoded;
+  let qty = 1;
+  if(uncoded){
+    const qtyInput = document.getElementById('pb-qty');
+    qty = parseInt(qtyInput? qtyInput.value : '1', 10) || 1;
+    if(qty<=0) qty = 1;
+  }
   pb.items.push({
     tempId: uid('dft'), productId: product.id, code: product.code,
     itemName: it? it.name:'—', classificationName: cl? cl.name:'—',
     itemTypeId: product.itemTypeId, classificationId: product.classificationId, priceCategoryId: product.priceCategoryId,
     price, making: weight*price,
     weight, karat: pb.karat, lineTotal: weight*price,
-    serial, barcodeValue, uid: newPieceUid(), selected: true
+    serial, barcodeValue, uid: newPieceUid(), selected: true,
+    uncoded: !!uncoded, qty
   });
   weightInput.value='';
+  const qtyEl = document.getElementById('pb-qty'); if(qtyEl) qtyEl.value='';
   render();
   const wEl = document.getElementById('pb-weight');
   if(wEl) wEl.focus();
@@ -5213,7 +5282,7 @@ function submitPurchaseBuilderInvoice(){
 
     items.forEach((it,i)=>{
       const pieceId = pieceIds[i];
-      state.pieces.push({id:pieceId, uid:it.uid||newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue});
+      state.pieces.push({id:pieceId, uid:it.uid||newPieceUid(), no:it.serial, date:todayStr(), invoiceId:rec.id, merchantId, productId:it.productId, itemTypeId:it.itemTypeId, classificationId:it.classificationId, priceCategoryId:it.priceCategoryId, karat:it.karat, weight:it.weight, barcodeValue:it.barcodeValue, uncoded: !!it.uncoded, qty: it.qty||1});
       generatedPieceIds.push(pieceId);
     });
     state.counters.piece = finalSerialCursor;
@@ -7053,6 +7122,21 @@ function setCustomerSaleWeight(pieceId, val){
   it.weight = v; recalcCsbLine(it); saveCsbDraft(); render();
 }
 function csbMinRate(it){ return Number(it.minRate!=null? it.minRate : 0)||0; }
+function csbColKeyNav(e, pieceId, field){
+  if(e.key!=='Enter' && e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+  e.preventDefault();
+  const idx = csb.items.findIndex(x=>x.pieceId===pieceId);
+  if(idx<0) return;
+  const dir = e.key==='ArrowUp' ? -1 : 1;
+  const targetIdx = idx+dir;
+  const val = e.target.value;
+  if(targetIdx>=0 && targetIdx<csb.items.length){
+    refocusAfterRender('csb-'+field+'-'+csb.items[targetIdx].pieceId);
+  }
+  if(field==='weight') setCustomerSaleWeight(pieceId, val);
+  else if(field==='goldRate') setCustomerSaleGoldRate(pieceId, val);
+  else if(field==='rate') setCustomerSaleRate(pieceId, val);
+}
 function setCustomerSaleRate(pieceId, val){
   const it = csb.items.find(x=>x.pieceId===pieceId);
   if(!it) return;
@@ -7147,6 +7231,10 @@ function renderCustomerSaleBuilder(){
       <div style="font-weight:800;color:var(--red);margin-bottom:4px;">⚠ مينفعش تحفظ الفاتورة دلوقتي</div>
       <div style="font-size:12.5px;color:var(--red);">أجر الجرام لـ${belowMinItems.length} قطعة أقل من سعر البيع المحدد لها وقت التكويد. عدّل الأجر في الجدول (محدد باللون الأحمر) قبل ما تقدر تحفظ أو تطبع.</div>
     </div>` : ''}
+    ${(csb.items.length && (csb.manualTotal==null||csb.manualTotal===''))? `<div class="card" style="margin-bottom:16px;border-color:var(--red);background:var(--red-bg);">
+      <div style="font-weight:800;color:var(--red);margin-bottom:4px;">⚠ لازم تكتب إجمالي الفاتورة</div>
+      <div style="font-size:12.5px;color:var(--red);">مينفعش تحفظ الفاتورة من غير ما تكتب رقم في خانة "الإجمالي (يدوي)" تحت — حتى لو نفس الرقم المحسوب تلقائي.</div>
+    </div>` : ''}
 
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
@@ -7229,9 +7317,9 @@ function renderCustomerSaleBuilder(){
               <td><input value="${esc(it.itemName)}" style="padding:6px 8px;font-size:12.5px;width:110px;" onchange="setCustomerSaleItemName('${it.pieceId}',this.value)"></td>
               <td class="muted">${esc(classificationName(it.classificationId))}</td>
               <td class="muted">عيار ${it.karat}</td>
-              <td><input type="text" inputmode="decimal" step="0.001" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)"></td>
-              <td><input type="text" inputmode="decimal" step="0.01" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)"></td>
-              <td><input type="text" inputmode="decimal" step="0.01" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;${it.rate<csbMinRate(it)-0.0001?'border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:700;':''}" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)"></td>
+              <td><input type="text" inputmode="decimal" step="0.001" id="csb-weight-${it.pieceId}" value="${it.weight.toFixed(3)}" style="padding:6px 8px;font-size:12.5px;width:90px;" title="أقصى وزن ${(it.origWeight!=null?it.origWeight:it.weight).toFixed(3)} جم" onchange="setCustomerSaleWeight('${it.pieceId}',this.value)" onkeydown="csbColKeyNav(event,'${it.pieceId}','weight')"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" id="csb-goldRate-${it.pieceId}" value="${Number(it.goldRate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;" onchange="setCustomerSaleGoldRate('${it.pieceId}',this.value)" onkeydown="csbColKeyNav(event,'${it.pieceId}','goldRate')"></td>
+              <td><input type="text" inputmode="decimal" step="0.01" id="csb-rate-${it.pieceId}" min="${csbMinRate(it).toFixed(2)}" value="${Number(it.rate||0).toFixed(2)}" style="padding:6px 8px;font-size:12.5px;${it.rate<csbMinRate(it)-0.0001?'border-color:var(--red);background:var(--red-bg);color:var(--red);font-weight:700;':''}" title="الحد الأدنى ${csbMinRate(it).toFixed(2)}" onchange="setCustomerSaleRate('${it.pieceId}',this.value)" onkeydown="csbColKeyNav(event,'${it.pieceId}','rate')"></td>
               <td class="total-col">
                 <input type="text" inputmode="decimal" step="0.01" value="${Number(it.lineTotal||0).toFixed(2)}"
                   style="padding:6px 8px;font-size:13px;font-weight:800;color:var(--navy);text-align:left;"
@@ -7311,6 +7399,12 @@ function addCustomerInline(){
 function submitCustomerSale(){
   if(!csb.items.length){ toast('امسح قطعة واحدة على الأقل'); return; }
   if(!csb.customerId){ toast('اختر العميل الأول من فوق'); return; }
+  if(csb.manualTotal==null || csb.manualTotal===''){
+    toast('اكتب إجمالي الفاتورة يدويًا في خانة "الإجمالي" الأول قبل ما تحفظ');
+    const totalEl = document.getElementById('csb-total');
+    if(totalEl){ totalEl.style.borderColor='var(--red)'; totalEl.focus(); }
+    return;
+  }
   const belowItems = csb.items.filter(it=> it.rate < csbMinRate(it) - 0.0001);
   if(belowItems.length){
     const names = belowItems.map(it=> esc(it.itemName)+' (أدنى '+csbMinRate(it).toFixed(2)+', المكتوب '+Number(it.rate).toFixed(2)+')').join(' — ');
@@ -8122,16 +8216,16 @@ function renderGoldStocktake(){
       <div class="card stat"><div class="label"><span>الوزن اللي اتجرد (ع${BASE_KARAT})</span></div><div class="value">${scannedWeight21.toFixed(3)} <small>جم</small></div></div>
     </div>
 
-    <div class="tbl-wrap" id="stk-table">
+    <div class="section-title" style="margin-top:0;">القطع المتبقي جردها (${missingRows.length})<div class="line"></div></div>
+    <div class="tbl-wrap" style="margin-bottom:22px;">
       <table class="tl-table">
         <thead><tr>
-          <th style="width:70px;">الحالة</th><th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
+          <th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
           <th style="width:70px;">العيار</th><th class="right total-col" style="width:100px;">الوزن</th>
         </tr></thead>
         <tbody>
-          ${rows.length? rows.map(p=>`
-            <tr style="${stkScanned[p.id]?'background:var(--green-bg);':''}">
-              <td>${stkScanned[p.id]? '<span class="pill pill-green">✓ اتجرد</span>' : '<span class="pill pill-muted">لسه</span>'}</td>
+          ${missingRows.length? missingRows.map(p=>`
+            <tr>
               <td class="mono muted">#${p.no}</td>
               <td class="muted num">${fmtDateRep(p.date)}</td>
               <td class="mono" style="font-size:11.5px;">${esc(p.barcodeValue||tagBarcodeValue(p))}</td>
@@ -8140,9 +8234,33 @@ function renderGoldStocktake(){
               <td class="muted">${esc(classificationName(p.classificationId)||'—')}</td>
               <td class="muted">ع${p.karat}</td>
               <td class="right total-col num" style="font-weight:700;">${Number(p.weight||0).toFixed(3)}</td>
-            </tr>`).join('') : `<tr class="empty-row"><td colspan="9">لا توجد قطع مطابقة لمعايير الجرد</td></tr>`}
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">🎉 كل القطع اتجردت</td></tr>`}
         </tbody>
-        ${rows.length? `<tfoot><tr><td colspan="8">الإجمالي</td><td class="right total-col num">${totalWeight.toFixed(3)}</td></tr></tfoot>`:''}
+        ${missingRows.length? `<tfoot><tr><td colspan="7">الإجمالي</td><td class="right total-col num">${(totalWeight-scannedRows.reduce((s,p)=>s+(Number(p.weight)||0),0)).toFixed(3)}</td></tr></tfoot>`:''}
+      </table>
+    </div>
+
+    <div class="section-title">القطع اللي اتجردت (${scannedRows.length})<div class="line"></div></div>
+    <div class="tbl-wrap" id="stk-table">
+      <table class="tl-table">
+        <thead><tr>
+          <th style="width:60px;">رقم</th><th style="width:95px;">التاريخ</th><th>الباركود</th><th>الكود</th><th>الصنف</th><th>التصنيف</th>
+          <th style="width:70px;">العيار</th><th class="right total-col" style="width:100px;">الوزن</th>
+        </tr></thead>
+        <tbody>
+          ${scannedRows.length? scannedRows.map(p=>`
+            <tr style="background:var(--green-bg);">
+              <td class="mono muted">#${p.no}</td>
+              <td class="muted num">${fmtDateRep(p.date)}</td>
+              <td class="mono" style="font-size:11.5px;">${esc(p.barcodeValue||tagBarcodeValue(p))}</td>
+              <td class="mono">${esc(pieceCode(p))}</td>
+              <td>${esc(pieceLabel(p))}</td>
+              <td class="muted">${esc(classificationName(p.classificationId)||'—')}</td>
+              <td class="muted">ع${p.karat}</td>
+              <td class="right total-col num" style="font-weight:700;">${Number(p.weight||0).toFixed(3)}</td>
+            </tr>`).join('') : `<tr class="empty-row"><td colspan="8">لسه معندكش أي قطعة اتجردت</td></tr>`}
+        </tbody>
+        ${scannedRows.length? `<tfoot><tr><td colspan="7">الإجمالي</td><td class="right total-col num">${scannedRows.reduce((s,p)=>s+(Number(p.weight)||0),0).toFixed(3)}</td></tr></tfoot>`:''}
       </table>
     </div>
   `;
@@ -9825,7 +9943,7 @@ function renderHomeAnalytics(){
   const yearRows  = topClassifications(yearStart);
   const sum = rows => rows.reduce((a,r)=>({p:a.p+r.pieces, w:a.w+r.weight, m:a.m+r.making}), {p:0,w:0,m:0});
   const ms = sum(monthRows), ys = sum(yearRows);
-  const monthName = now.toLocaleDateString('ar-EG',{month:'long', year:'numeric'});
+  const monthName = now.toLocaleDateString('ar-EG-u-nu-latn',{month:'long', year:'numeric'});
   return `
     <div class="grid grid-4" style="margin-top:6px;">
       <div class="card stat"><div class="label"><span>قطع مباعة هذا الشهر</span></div><div class="value">${ms.p}</div></div>
@@ -9955,7 +10073,7 @@ function renderGoldPrices(){
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
         <button class="btn btn-gold" data-enter-submit onclick="saveGold21()">حفظ الأسعار</button>
         <span class="muted" style="font-size:12px;">
-          ${g.updatedAt? ('آخر تحديث: '+fmtDateRep(g.updatedAt)+' — '+new Date(g.updatedAt).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})) : 'لسه مفيش أسعار محفوظة'}
+          ${g.updatedAt? ('آخر تحديث: '+fmtDateRep(g.updatedAt)+' — '+new Date(g.updatedAt).toLocaleTimeString('ar-EG-u-nu-latn',{hour:'2-digit',minute:'2-digit'})) : 'لسه مفيش أسعار محفوظة'}
         </span>
       </div>
     </div>
