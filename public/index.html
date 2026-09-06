@@ -1239,7 +1239,7 @@ window.addEventListener('hashchange', ()=>{
   applyHash();
 });
 
-/* ====== تحويل الأرقام العربية/الفارسية لإنجليزية تلقائيًا وانت بتكتب في أي خانة رقمية ====== */
+/* ====== تحويل الأرقام العربية/الفارسية لإنجليزية تلقائيًا في أي خانة كتابة في البرنامج كله ====== */
 function convertArabicDigits(str){
   return String(str).replace(/[٠-٩۰-۹]/g, function(d){
     const code = d.charCodeAt(0);
@@ -1251,10 +1251,12 @@ function convertArabicDigits(str){
 document.addEventListener('input', (e)=>{
   const el = e.target;
   if(!el || !el.tagName) return;
-  if(el.tagName.toUpperCase()!=='INPUT') return;
-  const type = (el.getAttribute('type')||'text').toLowerCase();
-  const mode = (el.getAttribute('inputmode')||'').toLowerCase();
-  if(type!=='tel' && mode!=='decimal' && mode!=='numeric') return;
+  const tag = el.tagName.toUpperCase();
+  if(tag!=='INPUT' && tag!=='TEXTAREA') return;
+  if(tag==='INPUT'){
+    const type = (el.getAttribute('type')||'text').toLowerCase();
+    if(type==='checkbox' || type==='radio' || type==='file' || type==='color' || type==='range') return;
+  }
   if(!/[٠-٩۰-۹]/.test(el.value||'')) return;
   const start = el.selectionStart, end = el.selectionEnd;
   el.value = convertArabicDigits(el.value);
