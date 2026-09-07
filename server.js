@@ -2,6 +2,7 @@
 // يشغّل الواجهة من مجلد public/ ويحفظ البيانات في data.json على نفس الجهاز
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -59,6 +60,62 @@ function sendJSON(res, statusCode, obj) {
   res.end(body);
 }
 
+// جلب سعر الذهب من موقع آي صاغة (market.isagha.com) — السيرفر بيجيب الصفحة ويستخرج الأرقام،
+// عشان المتصفح مايقدرش يعمل fetch مباشر لموقع خارجي (قيود CORS).
+// ملحوظة: ده استخراج من نص الصفحة، فلو الموقع غيّر شكله ممكن يتعطل — عشان كده بنتحقق إن الأرقام
+// في نطاق منطقي لسعر الذهب قبل ما نرجّعها، وبنرجّع خطأ واضح بدل رقم غلط لو حصل أي شك.
+function fetchIsaghaPrices() {
+  return new Promise((resolve, reject) => {
+    const req = https.get('https://market.isagha.com/prices', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept-Language': 'ar,en;q=0.8',
+      },
+      timeout: 10000,
+    }, (r) => {
+      if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {
+        https.get(r.headers.location, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r2) => collectBody(r2, resolve, reject));
+        return;
+      }
+      collectBody(r, resolve, reject);
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+  });
+
+  function collectBody(r, resolve, reject) {
+    let data = '';
+    r.setEncoding('utf8');
+    r.on('data', (c) => { data += c; if (data.length > 3 * 1024 * 1024) { r.destroy(); reject(new Error('too large')); } });
+    r.on('end', () => {
+      try {
+        const karats = [24, 22, 21, 18];
+        const out = {};
+        karats.forEach((k) => {
+          const re = new RegExp('عيار\\s*' + k + '[\\s\\S]{0,250}?شراء[\\s\\S]{0,80}?([\\d]+(?:\\.[\\d]+)?)[\\s\\S]{0,120}?بيع[\\s\\S]{0,80}?([\\d]+(?:\\.[\\d]+)?)', 'i');
+          const m = data.match(re);
+          if (m) {
+            const buy = parseFloat(m[1]);
+            const sell = parseFloat(m[2]);
+            // فحص منطقي: سعر الذهب للجرام المفروض يكون في مدى معقول
+            if (buy > 500 && buy < 30000 && sell > 500 && sell < 30000 && sell >= buy) {
+              out[k] = { buy, sell };
+            }
+          }
+        });
+        if (Object.keys(out).length === 0) {
+          reject(new Error('تعذر استخراج الأسعار من الصفحة — شكل الموقع ممكن يكون اتغيّر'));
+          return;
+        }
+        resolve(out);
+      } catch (e) {
+        reject(e);
+      }
+    });
+    r.on('error', reject);
+  }
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -105,6 +162,13 @@ const server = http.createServer((req, res) => {
       'Content-Length': Buffer.byteLength(raw),
     });
     res.end(raw);
+    return;
+  }
+
+  if (req.url.startsWith('/api/gold-price-live')) {
+    fetchIsaghaPrices()
+      .then((prices) => sendJSON(res, 200, { ok: true, prices, source: 'isagha.com', fetchedAt: new Date().toISOString() }))
+      .catch((e) => sendJSON(res, 502, { ok: false, error: 'تعذر جلب السعر من آي صاغة: ' + (e && e.message ? e.message : 'خطأ غير معروف') }));
     return;
   }
 

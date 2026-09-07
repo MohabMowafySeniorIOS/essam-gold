@@ -340,17 +340,21 @@
     font-family:'Tajawal';font-weight:700;font-size:13.5px;cursor:pointer;transition:.15s;}
   .hs-btn:hover{background:#e2eaf4;}
   .hs-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
-  .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;}
-  .sc-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);
-    border-right:4px solid var(--navy);border-radius:10px;padding:16px 14px;text-decoration:none;
-    color:var(--text);box-shadow:0 1px 3px rgba(16,44,77,.07);transition:.15s;}
-  .sc-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,44,77,.14);border-right-color:var(--gold-bright);}
+  .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;}
+  .sc-card{display:flex;flex-direction:column;align-items:flex-start;gap:14px;background:#fff;border:1px solid var(--line);
+    border-radius:14px;padding:18px 18px 16px;text-decoration:none;position:relative;overflow:hidden;
+    color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.04);transition:.18s;}
+  .sc-card::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;
+    background:linear-gradient(90deg,var(--gold-bright),var(--navy));opacity:0;transition:.18s;}
+  .sc-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(16,20,10,.13);border-color:transparent;}
+  .sc-card:hover::before{opacity:1;}
   .sc-jiggle{animation:sc-jiggle-kf .28s ease-in-out infinite;cursor:pointer;}
   .sc-jiggle:nth-child(even){animation-delay:.07s;}
   @keyframes sc-jiggle-kf{0%{transform:rotate(-1deg);}50%{transform:rotate(1deg);}100%{transform:rotate(-1deg);}}
-  .sc-ic{font-size:22px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
-    background:#eef2f7;border-radius:9px;flex:none;}
-  .sc-lbl{font-weight:700;font-size:13.5px;}
+  .sc-ic{font-size:21px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#141414,#2a2a2a);color:var(--gold-bright);border-radius:12px;flex:none;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+  .sc-lbl{font-weight:800;font-size:13.5px;color:var(--text);}
 
   /* ====== المربعات (شاشة مكثّفة) ====== */
   .sq-wrap{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;}
@@ -569,6 +573,7 @@
   .tl-table tr.row-editable:hover{background:#eef3fa;}
 </style>
 <style id="thermal-page-style"></style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -1379,6 +1384,12 @@ function render(){
   };
   main.innerHTML = renderers[currentView] ? renderers[currentView]() : '<p>غير موجود</p>';
   applyEditDeletePermission();
+  if(currentView==='home' && (uiState.homeTab||'shortcuts')==='analytics'){
+    const now = new Date();
+    const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    const monthStart = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+    setTimeout(()=>initHomeSalesChart(topClassifications(monthStart)), 0);
+  }
   if(pendingFocusId){
     const id = pendingFocusId; pendingFocusId = null;
     const el = document.getElementById(id);
@@ -7066,7 +7077,8 @@ function renderCustomerSales(){
             <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
               <b class="num" style="color:var(--navy);">${Number(due).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(Number(due).toFixed(2))}</span></td>
             <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>
-              ${inv.paymentMethod? `<div class="muted" style="font-size:10.5px;margin-top:3px;">${esc(csbPaymentMethodLabel(inv.collectionMethod||inv.paymentMethod))}</div>`:''}</td>
+              ${inv.paymentMethod==='cash_electronic'? `<div class="muted" style="font-size:10.5px;margin-top:3px;">نقدي ${fmtCash(inv.cashPart||0)} + ${esc(csbPaymentMethodLabel(inv.electronicMethod))} ${fmtCash(inv.electronicPart||0)}</div>`
+                : (inv.paymentMethod? `<div class="muted" style="font-size:10.5px;margin-top:3px;">${esc(csbPaymentMethodLabel(inv.collectionMethod||inv.paymentMethod))}</div>`:'')}</td>
             <td>${editable? `<button class="btn btn-sm btn-ghost" style="white-space:nowrap;" title="متبقي ${Math.max(0,invoiceHoursLeft(inv)).toFixed(1)} ساعة" onclick="tryReopenInvoice('CS','${inv.id}')">✎ تعديل</button>` : `<span style="cursor:pointer;" onclick="tryReopenInvoice('CS','${inv.id}')">${invoiceLockChip(inv)}</span>`}</td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-ghost" onclick="showInvoiceQR('CS','${inv.id}')">▣ كيو آر</button>
@@ -7430,6 +7442,7 @@ function renderCustomerSaleBuilder(){
           <option value="instapay" ${csb.payMode==='instapay'?'selected':''}>انستاباي (المبلغ بالكامل)</option>
           <option value="vodafone" ${csb.payMode==='vodafone'?'selected':''}>فودافون كاش (المبلغ بالكامل)</option>
           <option value="credit" ${csb.payMode==='credit'?'selected':''}>آجل (على الحساب بالكامل)</option>
+          <option value="cash_electronic" ${csb.payMode==='cash_electronic'?'selected':''}>نقدي + إلكتروني — جزء نقدي والباقي انستاباي/فودافون كاش</option>
           <option value="partial" ${csb.payMode==='partial'?'selected':''}>جزئي — أدفع دلوقتي جزء والباقي آجل</option>
         </select>
       </div>
@@ -7441,7 +7454,19 @@ function renderCustomerSaleBuilder(){
           <option value="vodafone" ${csb.partialMethod==='vodafone'?'selected':''}>فودافون كاش</option>
         </select>
       </div>`:''}
-      <div class="field"><label>${csb.payMode==='partial'?'المحصّل دلوقتي (من إجمالي الفاتورة)':'المبلغ المحصّل'}</label>
+      ${csb.payMode==='cash_electronic'? `
+      <div class="field"><label>المبلغ النقدي</label>
+        <input type="text" inputmode="decimal" step="0.01" id="csb-cash-part" value="${Number(csb.cashPart||0).toFixed(2)}" oninput="csbSetCashElectronic('cash', this.value)"></div>
+      <div class="field"><label>طريقة الباقي</label>
+        <select id="csb-electronic-method" onchange="csb.electronicMethod=this.value;saveCsbDraft();">
+          <option value="instapay" ${(!csb.electronicMethod||csb.electronicMethod==='instapay')?'selected':''}>انستاباي</option>
+          <option value="vodafone" ${csb.electronicMethod==='vodafone'?'selected':''}>فودافون كاش</option>
+        </select>
+      </div>
+      <div class="field"><label>مبلغ الباقي (إلكتروني)</label>
+        <input type="text" inputmode="decimal" step="0.01" id="csb-electronic-part" value="${Number(csb.electronicPart||0).toFixed(2)}" oninput="csbSetCashElectronic('electronic', this.value)"></div>
+      `:''}
+      <div class="field"><label>${(csb.payMode==='partial'||csb.payMode==='cash_electronic')?'المحصّل دلوقتي (من إجمالي الفاتورة)':'المبلغ المحصّل'}</label>
         <input type="text" inputmode="decimal" step="0.01" id="csb-paid" value="${csbPaidDefault(totalAll).toFixed(2)}"
           ${csb.payMode==='partial'?'':'readonly'} oninput="csbSetPaidAmount(this.value)"></div>
       <div class="field">
@@ -7456,12 +7481,17 @@ function renderCustomerSaleBuilder(){
     </div>`;
 }
 function csbPaymentMethodLabel(m){
-  return {cash:'نقدي', instapay:'انستاباي', vodafone:'فودافون كاش', credit:'آجل', partial:'جزئي'}[m] || 'نقدي';
+  return {cash:'نقدي', instapay:'انستاباي', vodafone:'فودافون كاش', credit:'آجل', partial:'جزئي', cash_electronic:'نقدي + إلكتروني'}[m] || 'نقدي';
 }
 function csbPaidDefault(totalAll){
   const mode = csb.payMode||'cash';
   if(mode==='cash'||mode==='instapay'||mode==='vodafone') return totalAll;
   if(mode==='credit') return 0;
+  if(mode==='cash_electronic'){
+    const cash = Math.max(0, Number(csb.cashPart)||0);
+    const elec = Math.max(0, Number(csb.electronicPart)||0);
+    return Math.min(cash+elec, totalAll);
+  }
   return Math.max(0, Math.min(Number(csb.paidAmount)||0, totalAll));
 }
 function csbSetPayMode(mode){
@@ -7469,7 +7499,21 @@ function csbSetPayMode(mode){
   const totalAll = csbEffectiveTotal();
   if(mode==='cash'||mode==='instapay'||mode==='vodafone') csb.paidAmount = totalAll;
   else if(mode==='credit') csb.paidAmount = 0;
+  else if(mode==='cash_electronic'){ csb.cashPart = totalAll; csb.electronicPart = 0; }
   // partial: سيب csb.paidAmount زي ما هو، المستخدم هيعدله بنفسه
+  saveCsbDraft();
+  render();
+}
+function csbSetCashElectronic(which, val){
+  const totalAll = csbEffectiveTotal();
+  let v = Math.max(0, parseFloat(val)||0);
+  if(which==='cash'){
+    csb.cashPart = Math.min(v, totalAll);
+    csb.electronicPart = Math.max(0, totalAll - csb.cashPart);
+  } else {
+    csb.electronicPart = Math.min(v, totalAll);
+    csb.cashPart = Math.max(0, totalAll - csb.electronicPart);
+  }
   saveCsbDraft();
   render();
 }
@@ -7537,7 +7581,11 @@ function submitCustomerSale(){
     savedId = uid('csale');
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
       customerId, items:invItems, note, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid,
-      paymentMethod: csb.payMode||'cash', collectionMethod: csb.payMode==='partial'? (csb.partialMethod||'cash') : (csb.payMode||'cash')});
+      paymentMethod: csb.payMode||'cash',
+      collectionMethod: csb.payMode==='partial'? (csb.partialMethod||'cash') : (csb.payMode||'cash'),
+      cashPart: csb.payMode==='cash_electronic'? (csb.cashPart||0) : undefined,
+      electronicPart: csb.payMode==='cash_electronic'? (csb.electronicPart||0) : undefined,
+      electronicMethod: csb.payMode==='cash_electronic'? (csb.electronicMethod||'instapay') : undefined});
   }, 'تم حفظ فاتورة العميل');
   csb = null; saveCsbDraft();
   const remainderKarats = Object.keys(remaindersByKarat);
@@ -10067,13 +10115,37 @@ function renderHomeAnalytics(){
       <div class="card stat pos"><div class="label"><span>أجر مبيعات هذا الشهر</span></div><div class="value">${fmtCash(ms.m)}</div></div>
       <div class="card stat"><div class="label"><span>قطع مباعة هذه السنة</span></div><div class="value">${ys.p}</div></div>
     </div>
-    <div class="section-title">أكثر التصنيفات مبيعًا<div class="line"></div></div>
+    <div class="section-title">أكثر التصنيفات مبيعًا — رسم بياني (خلال الشهر)<div class="line"></div></div>
+    <div class="card" style="padding:18px;margin-bottom:18px;">
+      ${monthRows.length? `<div style="position:relative;height:280px;"><canvas id="home-sales-chart"></canvas></div>`
+        : `<div class="empty-state" style="padding:20px;"><div class="ic">📊</div>لسه مفيش مبيعات الشهر ده عشان نرسم بيها</div>`}
+    </div>
+    <div class="section-title">أكثر التصنيفات مبيعًا — تفصيل بالأرقام<div class="line"></div></div>
     <div class="grid grid-2">
       ${renderTopClassCard('خلال الشهر', 'من أول '+monthName+' لحد النهارده — '+ms.p+' قطعة، '+ms.w.toFixed(3)+' جم', monthRows)}
       ${renderTopClassCard('خلال السنة', 'من أول يناير '+now.getFullYear()+' لحد النهارده — '+ys.p+' قطعة، '+ys.w.toFixed(3)+' جم', yearRows)}
     </div>
     ${renderGoldCountInventory()}
   `;
+}
+let _homeSalesChart = null;
+function initHomeSalesChart(rows){
+  const canvas = document.getElementById('home-sales-chart');
+  if(!canvas || typeof Chart==='undefined') return;
+  if(_homeSalesChart){ _homeSalesChart.destroy(); _homeSalesChart=null; }
+  const labels = rows.map(r=>classificationName(r.id));
+  const weights = rows.map(r=>Number(r.weight.toFixed(3)));
+  const palette = ['#a6790a','#141414','#c9971e','#6b6560','#7a5a05','#9a9488','#e7dcb8','#3a3a3a'];
+  _homeSalesChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label:'الوزن المباع (جم)', data: weights,
+      backgroundColor: labels.map((_,i)=>palette[i%palette.length]), borderRadius:6, maxBarThickness:46 }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{rtl:true, callbacks:{label:(ctx)=> ctx.parsed.y.toFixed(3)+' جم'}} },
+      scales:{ y:{beginAtZero:true, ticks:{callback:(v)=>v+' جم'}}, x:{ticks:{font:{family:'Tajawal'}}} }
+    }
+  });
 }
 function renderHomeTreasury(){
   const gold21 = goldTo21(state.treasury.gold);
@@ -10188,10 +10260,12 @@ function renderGoldPrices(){
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">
         <button class="btn btn-gold" data-enter-submit onclick="saveGold21()">حفظ الأسعار</button>
+        <button class="btn btn-ghost" id="gp-live-btn" onclick="fetchLiveGoldPrice()" type="button">📡 جلب السعر من البورصة (آي صاغة)</button>
         <span class="muted" style="font-size:12px;">
           ${g.updatedAt? ('آخر تحديث: '+fmtDateRep(g.updatedAt)+' — '+new Date(g.updatedAt).toLocaleTimeString('ar-EG-u-nu-latn',{hour:'2-digit',minute:'2-digit'})) : 'لسه مفيش أسعار محفوظة'}
         </span>
       </div>
+      <div id="gp-live-result" class="muted" style="font-size:12px;margin-top:6px;"></div>
     </div>
 
     <div class="section-title">باقي العيارات<div class="line"></div></div>
@@ -10222,6 +10296,34 @@ function renderGoldPrices(){
         </tbody>
       </table>
     </div>`;
+}
+async function fetchLiveGoldPrice(){
+  const btn = document.getElementById('gp-live-btn');
+  const resultEl = document.getElementById('gp-live-result');
+  if(btn) btn.disabled = true;
+  if(resultEl) resultEl.textContent = 'جارِ الجلب من آي صاغة...';
+  try{
+    const r = await fetch('/api/gold-price-live');
+    const data = await r.json();
+    if(!data.ok || !data.prices || !data.prices[21]){
+      throw new Error(data.error || 'الرد من السيرفر مش متوقع');
+    }
+    const p21 = data.prices[21];
+    const input = document.getElementById('gp-sell21');
+    if(input) input.value = Number(p21.sell).toFixed(2);
+    if(resultEl){
+      const parts = Object.keys(data.prices).sort((a,b)=>b-a).map(k=>'ع'+k+': '+data.prices[k].sell.toFixed(2)).join(' — ');
+      resultEl.innerHTML = '<span style="color:var(--green);">✓ اتجاب من آي صاغة (بيع)</span> — '+parts+
+        ' — <b>راجع الرقم قبل ما تحفظ</b>، السعر ده مسحوب من موقع خارجي ومسؤوليتك تتأكد إنه صح قبل الحفظ.';
+    }
+    toast('اتجاب سعر عيار 21 من آي صاغة — راجعه واضغط "حفظ الأسعار"');
+  }catch(e){
+    console.error(e);
+    if(resultEl) resultEl.innerHTML = '<span style="color:var(--red);">✗ تعذر الجلب: '+esc(e.message||'خطأ غير معروف')+'</span>';
+    toast('تعذر جلب السعر من آي صاغة — جرب تاني أو اكتب السعر يدويًا');
+  }finally{
+    if(btn) btn.disabled = false;
+  }
 }
 function saveGold21(){
   const sell = parseFloat(document.getElementById('gp-sell21').value)||0;
