@@ -569,6 +569,7 @@
   .tl-table tr.row-editable:hover{background:#eef3fa;}
 </style>
 <style id="thermal-page-style"></style>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 <div id="shell">
@@ -834,7 +835,16 @@ function persist(){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify(state)
       });
+      if(r.status===409){
+        // في تاب أو جهاز تاني حفظ بعد ما إحنا حمّلنا البيانات — نوقف أي حفظ تاني فورًا
+        // عشان منمسحش تعديلاته، ونطلب من المستخدم يحدّث الصفحة يجيب آخر نسخة
+        stateLoaded = false;
+        showConflictLockScreen();
+        return;
+      }
       if(!r.ok) throw new Error('save failed: '+r.status);
+      const data = await r.json().catch(()=>({}));
+      if(typeof data.rev==='number') state._rev = data.rev;
       saveDirty = false;
       setSaveIndicator('تم الحفظ ✓');
     }catch(e){
@@ -842,6 +852,20 @@ function persist(){
       setSaveIndicator('تعذر الحفظ! تحقق من تشغيل السيرفر');
     }
   }, 250);
+}
+function showConflictLockScreen(){
+  document.body.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#141414;padding:20px;">
+      <div style="background:#fff;border-radius:14px;padding:32px;max-width:440px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);">
+        <div style="font-size:40px;margin-bottom:10px;">🔄</div>
+        <h2 style="margin:0 0 10px;font-family:'Almarai',sans-serif;color:#a6790a;">في تحديثات جديدة من جهاز تاني</h2>
+        <p style="color:var(--muted);font-size:13.5px;line-height:1.7;margin-bottom:18px;">
+          حد تاني (تاب تاني أو جهاز تاني) حفظ بيانات جديدة وإنت شغال على نسخة قديمة. عشان محدش يفقد شغله،
+          وقفنا الحفظ هنا. دوس تحديث الصفحة عشان تجيب آخر نسخة، وبعدين كمّل شغلك من جديد.
+        </p>
+        <button class="btn btn-gold" onclick="location.reload()">🔄 تحديث الصفحة الآن</button>
+      </div>
+    </div>`;
 }
 /* لو المستخدم قفل التاب أو نقل صفحة وفيه حفظ لسه مستني، ابعته فورًا بدل ما يضيع */
 window.addEventListener('beforeunload', ()=>{
@@ -1568,7 +1592,7 @@ function saleItemClassificationId(it){
 }
 function topClassifications(fromISO){
   const map = {};
-  state.salesInvoices.forEach(inv=>{
+  const tally = (inv)=>{
     const d = String(inv.date).slice(0,10);
     if(fromISO && d < fromISO) return;
     (inv.items||[]).forEach(it=>{
@@ -1577,9 +1601,11 @@ function topClassifications(fromISO){
       if(!map[key]) map[key] = {id:cid, pieces:0, weight:0, making:0};
       map[key].pieces += 1;
       map[key].weight += Number(it.weight)||0;
-      map[key].making += Number(it.making!=null? it.making : (it.total||0))||0;
+      map[key].making += Number(it.making!=null? it.making : (it.total!=null? it.total : (it.lineTotal||0)))||0;
     });
-  });
+  };
+  state.salesInvoices.forEach(tally);
+  state.customerSales.forEach(tally);
   return Object.values(map).sort((a,b)=> b.pieces-a.pieces || b.weight-a.weight);
 }
 function classificationName(id){
@@ -2529,6 +2555,7 @@ function renderScbBuilder(){
           style="flex:1;min-width:220px;padding:7px 10px;font-size:13px;"
           onkeydown="if(event.key==='Enter'){event.preventDefault();addScbPieceByScan();}">
         <button class="btn btn-sm btn-gold" onclick="addScbPieceByScan()">+ إضافة</button>
+        <button class="btn btn-sm btn-ghost" onclick="openCameraQrScanner('scb')" type="button">📷 مسح بالكاميرا</button>
         <span class="kv-chip">قطع: <b>${scb.items.length}</b></span>
         <span class="kv-chip">وزن: <b>${totalWeight.toFixed(3)} جم</b></span>
         <span class="kv-chip">إجمالي: <b>${fmtCash(totalCash)}</b></span>
@@ -7038,7 +7065,8 @@ function renderCustomerSales(){
             <td class="right num">${fmtCash(inv.totalMaking||0)}</td>
             <td class="right total-col"><span class="valwrap" style="justify-content:flex-start;">
               <b class="num" style="color:var(--navy);">${Number(due).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>${copyBtn(Number(due).toFixed(2))}</span></td>
-            <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span></td>
+            <td><span class="pill ${inv.amountPaidNow>=due?'pill-green':(inv.amountPaidNow>0?'pill-gold':'pill-red')}">${inv.amountPaidNow>=due?'مدفوع':(inv.amountPaidNow>0?'جزئي':'آجل')}</span>
+              ${inv.paymentMethod? `<div class="muted" style="font-size:10.5px;margin-top:3px;">${esc(csbPaymentMethodLabel(inv.collectionMethod||inv.paymentMethod))}</div>`:''}</td>
             <td>${editable? `<button class="btn btn-sm btn-ghost" style="white-space:nowrap;" title="متبقي ${Math.max(0,invoiceHoursLeft(inv)).toFixed(1)} ساعة" onclick="tryReopenInvoice('CS','${inv.id}')">✎ تعديل</button>` : `<span style="cursor:pointer;" onclick="tryReopenInvoice('CS','${inv.id}')">${invoiceLockChip(inv)}</span>`}</td>
             <td><div style="display:flex;gap:6px;justify-content:flex-end;">
               <button class="btn btn-sm btn-ghost" onclick="showInvoiceQR('CS','${inv.id}')">▣ كيو آر</button>
@@ -7068,6 +7096,60 @@ function discardCsbDraft(){
     csb = null; saveCsbDraft(); closeModal(); render();
   }, {confirmLabel:'إلغاء الفاتورة'});
 }
+/* ============================= مسح كيو آر بكاميرا الهاتف ============================= */
+let _cameraQr = null;
+let _cameraQrLast = {code:'', t:0};
+const CAMERA_SCAN_TARGETS = {
+  csb: {inputId:'csb-scan', addFn:'addCustomerSalePieceByScan'},
+  scb: {inputId:'scb-scan', addFn:'addScbPieceByScan'},
+};
+function openCameraQrScanner(scope){
+  if(typeof Html5Qrcode === 'undefined'){ toast('مكتبة الكاميرا لسه بتتحمل، جرب تاني بعد شوية'); return; }
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closeCameraQrScanner()">
+      <div class="modal" style="max-width:420px;">
+        <h2>📷 مسح بالكاميرا</h2>
+        <div class="hint" style="margin-bottom:10px;">وجّه كاميرا الهاتف على كيو آر القطعة — هتتضاف تلقائي في الفاتورة أول ما تتقرأ، وتقدر تكمل تصوّر قطع تانية على طول</div>
+        <div id="camera-qr-box" style="width:100%;border-radius:10px;overflow:hidden;background:#000;"></div>
+        <div id="camera-qr-status" class="muted" style="font-size:12.5px;margin-top:8px;text-align:center;min-height:16px;"></div>
+        <div class="modal-actions">
+          <button class="btn btn-gold" style="width:100%;" onclick="closeCameraQrScanner()">✓ إغلاق الكاميرا</button>
+        </div>
+      </div>
+    </div>`;
+  _cameraQrLast = {code:'', t:0};
+  _cameraQr = new Html5Qrcode('camera-qr-box');
+  _cameraQr.start(
+    {facingMode:'environment'},
+    {fps:10, qrbox:{width:230,height:230}},
+    (decodedText)=>{ cameraQrHandleResult(scope, decodedText); },
+    ()=>{}
+  ).catch(()=>{
+    toast('معرفناش نفتح الكاميرا — تأكد إنك سمحت للموقع بالوصول للكاميرا');
+    closeCameraQrScanner();
+  });
+}
+function cameraQrHandleResult(scope, decodedText){
+  const now = Date.now();
+  if(decodedText===_cameraQrLast.code && (now-_cameraQrLast.t)<2000) return; // منع تكرار نفس القطعة كل فريم
+  _cameraQrLast = {code:decodedText, t:now};
+  const t = CAMERA_SCAN_TARGETS[scope];
+  if(!t) return;
+  const statusEl = document.getElementById('camera-qr-status');
+  if(statusEl) statusEl.textContent = '✓ اتقرأ: '+decodedText;
+  const input = document.getElementById(t.inputId);
+  if(input) input.value = decodedText;
+  window[t.addFn]();
+}
+function closeCameraQrScanner(){
+  if(_cameraQr){
+    _cameraQr.stop().then(()=>{ try{_cameraQr.clear();}catch(e){} _cameraQr=null; closeModal(); }).catch(()=>{ _cameraQr=null; closeModal(); });
+  } else {
+    closeModal();
+  }
+}
+
 function addCustomerSalePieceByScan(){
   const input = document.getElementById('csb-scan');
   const raw = input? input.value : '';
@@ -7229,15 +7311,6 @@ function renderCustomerSaleBuilder(){
       ${navBtn('customer-sales','← رجوع لقائمة الفواتير')}
     </div>
 
-    ${belowMinItems.length? `<div class="card" style="margin-bottom:16px;border-color:var(--red);background:var(--red-bg);">
-      <div style="font-weight:800;color:var(--red);margin-bottom:4px;">⚠ مينفعش تحفظ الفاتورة دلوقتي</div>
-      <div style="font-size:12.5px;color:var(--red);">أجر الجرام لـ${belowMinItems.length} قطعة أقل من سعر البيع المحدد لها وقت التكويد. عدّل الأجر في الجدول (محدد باللون الأحمر) قبل ما تقدر تحفظ أو تطبع.</div>
-    </div>` : ''}
-    ${(csb.items.length && (csb.manualTotal==null||csb.manualTotal===''))? `<div class="card" style="margin-bottom:16px;border-color:var(--red);background:var(--red-bg);">
-      <div style="font-weight:800;color:var(--red);margin-bottom:4px;">⚠ لازم تكتب إجمالي الفاتورة</div>
-      <div style="font-size:12.5px;color:var(--red);">مينفعش تحفظ الفاتورة من غير ما تكتب رقم في خانة "الإجمالي (يدوي)" تحت — حتى لو نفس الرقم المحسوب تلقائي.</div>
-    </div>` : ''}
-
     <div class="card" style="margin-bottom:16px;">
       <div class="grid grid-4">
         <div class="field" style="margin:0;"><label>العميل</label>
@@ -7266,6 +7339,7 @@ function renderCustomerSaleBuilder(){
           style="flex:1;min-width:220px;padding:7px 10px;font-size:13px;"
           onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomerSalePieceByScan();}">
         <button class="btn btn-sm btn-gold" style="white-space:nowrap;" onclick="addCustomerSalePieceByScan()">+ إضافة</button>
+        <button class="btn btn-sm btn-ghost" style="white-space:nowrap;" onclick="openCameraQrScanner('csb')" type="button">📷 مسح بالكاميرا</button>
         <span class="kv-chip">قطع: <b>${csb.items.length}</b></span>
         <span class="kv-chip">وزن: <b>${totalWeight.toFixed(3)} جم</b></span>
         <span class="kv-chip">ذهب: <b>${fmtCash(totalGoldValue)}</b></span>
@@ -7352,12 +7426,22 @@ function renderCustomerSaleBuilder(){
       <div class="field">
         <label>طريقة الدفع</label>
         <select id="csb-paymode" onchange="csbSetPayMode(this.value)">
-          <option value="cash" ${(!csb.payMode||csb.payMode==='cash')?'selected':''}>نقدًا (المبلغ بالكامل)</option>
+          <option value="cash" ${(!csb.payMode||csb.payMode==='cash')?'selected':''}>نقدي (المبلغ بالكامل)</option>
+          <option value="instapay" ${csb.payMode==='instapay'?'selected':''}>انستاباي (المبلغ بالكامل)</option>
+          <option value="vodafone" ${csb.payMode==='vodafone'?'selected':''}>فودافون كاش (المبلغ بالكامل)</option>
           <option value="credit" ${csb.payMode==='credit'?'selected':''}>آجل (على الحساب بالكامل)</option>
           <option value="partial" ${csb.payMode==='partial'?'selected':''}>جزئي — أدفع دلوقتي جزء والباقي آجل</option>
         </select>
       </div>
-      <div class="field"><label>المحصّل نقداً الآن (من إجمالي الفاتورة)</label>
+      ${csb.payMode==='partial'? `<div class="field">
+        <label>طريقة تحصيل الجزء المدفوع</label>
+        <select id="csb-partial-method" onchange="csb.partialMethod=this.value;saveCsbDraft();">
+          <option value="cash" ${(!csb.partialMethod||csb.partialMethod==='cash')?'selected':''}>نقدي</option>
+          <option value="instapay" ${csb.partialMethod==='instapay'?'selected':''}>انستاباي</option>
+          <option value="vodafone" ${csb.partialMethod==='vodafone'?'selected':''}>فودافون كاش</option>
+        </select>
+      </div>`:''}
+      <div class="field"><label>${csb.payMode==='partial'?'المحصّل دلوقتي (من إجمالي الفاتورة)':'المبلغ المحصّل'}</label>
         <input type="text" inputmode="decimal" step="0.01" id="csb-paid" value="${csbPaidDefault(totalAll).toFixed(2)}"
           ${csb.payMode==='partial'?'':'readonly'} oninput="csbSetPaidAmount(this.value)"></div>
       <div class="field">
@@ -7371,16 +7455,19 @@ function renderCustomerSaleBuilder(){
       </div>
     </div>`;
 }
+function csbPaymentMethodLabel(m){
+  return {cash:'نقدي', instapay:'انستاباي', vodafone:'فودافون كاش', credit:'آجل', partial:'جزئي'}[m] || 'نقدي';
+}
 function csbPaidDefault(totalAll){
   const mode = csb.payMode||'cash';
-  if(mode==='cash') return totalAll;
+  if(mode==='cash'||mode==='instapay'||mode==='vodafone') return totalAll;
   if(mode==='credit') return 0;
   return Math.max(0, Math.min(Number(csb.paidAmount)||0, totalAll));
 }
 function csbSetPayMode(mode){
   csb.payMode = mode;
   const totalAll = csbEffectiveTotal();
-  if(mode==='cash') csb.paidAmount = totalAll;
+  if(mode==='cash'||mode==='instapay'||mode==='vodafone') csb.paidAmount = totalAll;
   else if(mode==='credit') csb.paidAmount = 0;
   // partial: سيب csb.paidAmount زي ما هو، المستخدم هيعدله بنفسه
   saveCsbDraft();
@@ -7449,7 +7536,8 @@ function submitCustomerSale(){
       itemName:it.itemName, barcodeValue:it.barcodeValue, classificationId:it.classificationId||null, itemTypeId:it.itemTypeId||null}));
     savedId = uid('csale');
     state.customerSales.push({id:savedId, no:state.counters.custSale++, date:todayStr(), createdAt:new Date().toISOString(),
-      customerId, items:invItems, note, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid});
+      customerId, items:invItems, note, totalCash:totalAll, totalMaking:effMaking, totalGoldValue, totalAll, totalWeight, amountPaidNow:paid,
+      paymentMethod: csb.payMode||'cash', collectionMethod: csb.payMode==='partial'? (csb.partialMethod||'cash') : (csb.payMode||'cash')});
   }, 'تم حفظ فاتورة العميل');
   csb = null; saveCsbDraft();
   const remainderKarats = Object.keys(remaindersByKarat);
@@ -9249,9 +9337,27 @@ function cashFlows(fromISO, toISO){
   });
   return {cin, cout, net:cin-cout};
 }
+/* الوزن اللي اتباع فعليًا (مش صافي بعد خصم اللي دخل) والنقدية اللي اتحصلت منه بالظبط —
+   ده اللي المفروض يتغطى (يتأمّن) بشراء نفس الوزن تاني، والنقدية دي "مكشوفة" لحد ما يحصل الشراء ده */
+function salesWeightCashFlow(fromISO, toISO){
+  const inRange = d=>{ d=String(d).slice(0,10); if(fromISO && d<fromISO) return false; if(toISO && d>toISO) return false; return true; };
+  let weight=0, cash=0;
+  state.salesInvoices.forEach(i=>{
+    if(!inRange(i.date)) return;
+    (i.items||[]).forEach(it=>{ weight += to21(it.weight, it.karat||i.karat); });
+    cash += Number(i.totalCash)||0;
+  });
+  state.customerSales.forEach(i=>{
+    if(!inRange(i.date)) return;
+    (i.items||[]).forEach(it=>{ weight += to21(it.weight, it.karat); });
+    cash += Number(i.totalCash!=null? i.totalCash : (i.totalAll||0));
+  });
+  return {weight, cash};
+}
 function renderWeightCoverCard(title, subtitle, fromISO, toISO){
   const w = weightFlows(fromISO, toISO);
   const c = cashFlows(fromISO, toISO);
+  const sw = salesWeightCashFlow(fromISO, toISO);
   const needBuy = w.net < 0? -w.net : 0;
   const surplus = w.net > 0? w.net : 0;
   return `
@@ -9262,16 +9368,24 @@ function renderWeightCoverCard(title, subtitle, fromISO, toISO){
       </div>
       <table class="grid-table">
         <tbody>
+          <tr style="background:#fff7e6;">
+            <td style="font-weight:800;color:#a6790a;">⚖ الوزن المطلوب للتأمين (إجمالي اللي اتباع بعيار ${BASE_KARAT})</td>
+            <td class="right num" style="font-weight:800;font-size:16px;color:#a6790a;">${sw.weight.toFixed(3)} جم</td>
+          </tr>
+          <tr style="background:#fff7e6;">
+            <td style="font-weight:800;color:#a6790a;">💰 النقدية المكشوفة (المتحصّلة من البيع ده)</td>
+            <td class="right num" style="font-weight:800;font-size:16px;color:#a6790a;">${fmtCash(sw.cash)}</td>
+          </tr>
           <tr><td>وزن داخل (شراء + كسر + قطع + مرتجعات) بعيار ${BASE_KARAT}</td><td class="right num" style="font-weight:700;color:var(--green);">${w.inW.toFixed(3)} جم</td></tr>
           <tr><td>وزن خارج (مبيعات + قطع مباعة) بعيار ${BASE_KARAT}</td><td class="right num" style="font-weight:700;color:var(--red);">${w.outW.toFixed(3)} جم</td></tr>
           <tr style="background:#f3f7fc;">
-            <td style="font-weight:800;">${needBuy? 'المفروض أشتري لتأمين الوزن' : 'فائض وزن مؤمّن'}</td>
+            <td style="font-weight:800;">${needBuy? 'المفروض أشتري لتأمين الوزن (صافي)' : 'فائض وزن مؤمّن (صافي)'}</td>
             <td class="right num" style="font-weight:800;font-size:16px;color:${needBuy?'var(--red)':'var(--green)'};">${(needBuy||surplus).toFixed(3)} جم</td>
           </tr>
           <tr><td>نقدية داخلة</td><td class="right num" style="color:var(--green);">${fmtCash(c.cin)}</td></tr>
           <tr><td>نقدية خارجة</td><td class="right num" style="color:var(--red);">${fmtCash(c.cout)}</td></tr>
           <tr style="background:#f3f7fc;">
-            <td style="font-weight:800;">${c.net<0? 'مكشوف نقدي' : 'صافي نقدي متاح'}</td>
+            <td style="font-weight:800;">${c.net<0? 'مكشوف نقدي (صافي)' : 'صافي نقدي متاح'}</td>
             <td class="right num" style="font-weight:800;font-size:16px;color:${c.net<0?'var(--red)':'var(--green)'};">${fmtCash(Math.abs(c.net))}</td>
           </tr>
         </tbody>

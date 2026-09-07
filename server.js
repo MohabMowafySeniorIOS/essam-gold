@@ -129,8 +129,18 @@ const server = http.createServer((req, res) => {
         if (tooLarge) return;
         try {
           const parsed = JSON.parse(body);
+          // حماية من تضارب الحفظ بين أكتر من تاب/جهاز: كل حفظة بتاخد رقم إصدار (_rev) بيزيد بواحد.
+          // لو اللي جاي من العميل مبني على إصدار قديم (حد تاني حفظ بعده)، نرفض الكتابة بدل ما نمسح تعديلات التاني.
+          const current = readState();
+          const currentRev = current && typeof current._rev === 'number' ? current._rev : 0;
+          const incomingRev = typeof parsed._rev === 'number' ? parsed._rev : 0;
+          if (current && incomingRev !== currentRev) {
+            sendJSON(res, 409, { ok: false, error: 'conflict', serverRev: currentRev });
+            return;
+          }
+          parsed._rev = currentRev + 1;
           writeState(parsed);
-          sendJSON(res, 200, { ok: true });
+          sendJSON(res, 200, { ok: true, rev: parsed._rev });
         } catch (e) {
           sendJSON(res, 400, { ok: false, error: 'بيانات غير صالحة' });
         }
