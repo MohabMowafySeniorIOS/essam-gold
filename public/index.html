@@ -9383,6 +9383,7 @@ function weightFlows(fromISO, toISO){
   state.goldLots.forEach(l=>{ if(!inRange(l.date)) return; if(l.dir==='buy') inW += l.weight21; else outW += l.weight21; });
   state.salesInvoices.forEach(i=>{ if(inRange(i.date)) addItems(i.items, i.karat, -1); });
   state.customerSales.forEach(i=>{ if(inRange(i.date)) addItems(i.items, null, -1); });
+  state.pendingSales.forEach(p=>{ if((p.status||'pending')==='confirmed' && inRange(p.confirmedDate||p.date)) outW += to21(p.weight, p.karat); });
   return {inW, outW, net: inW-outW};
 }
 function cashFlows(fromISO, toISO){
@@ -9408,6 +9409,12 @@ function salesWeightCashFlow(fromISO, toISO){
     if(!inRange(i.date)) return;
     (i.items||[]).forEach(it=>{ weight += to21(it.weight, it.karat); });
     cash += Number(i.totalCash!=null? i.totalCash : (i.totalAll||0));
+  });
+  state.pendingSales.forEach(p=>{
+    if((p.status||'pending')!=='confirmed') return;
+    if(!inRange(p.confirmedDate||p.date)) return;
+    weight += to21(p.weight, p.karat);
+    cash += Number(p.totalCash)||0;
   });
   return {weight, cash};
 }
@@ -9868,13 +9875,17 @@ function renderSquares(){
         <div class="sq-f"><span>عيار</span>
           <select id="sq-karat">${state.karats.map(k=>`<option value="${k}" ${karat===k?'selected':''}>${k}</option>`).join('')}</select>
         </div>
-        <input type="text" inputmode="decimal" step="0.001" id="sq-weight" style="display:none;" oninput="sqRecalc()">
-        <input type="text" inputmode="decimal" step="0.01" id="sq-price" style="display:none;" oninput="sqRecalc()">
+        <div class="sq-f" id="sq-weight-wrap" style="display:none;"><span>الوزن (جم)</span>
+          <input type="text" inputmode="decimal" step="0.001" id="sq-weight" oninput="sqRecalc()"></div>
+        <div class="sq-f" id="sq-price-wrap" style="display:none;"><span>السعر</span>
+          <input type="text" inputmode="decimal" step="0.01" id="sq-price" oninput="sqRecalc()"></div>
+        <div class="sq-f auto" id="sq-manual-add-wrap" style="display:none;"><span>&nbsp;</span>
+          <button class="btn btn-sm btn-gold" onclick="sqAdd()" type="button">+ إضافة</button></div>
         <input id="sq-total" readonly style="display:none;" value="0.00">
-        <div class="sq-f grow"><span>كود المرتجع أو المردود</span>
-          <input id="sq-retcode" placeholder="ادخل كود المرتجع أو المردود"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();sqAdd();}"></div>
-        <div class="sq-f auto"><span>&nbsp;</span><button class="btn btn-sm btn-gold" data-enter-submit onclick="sqAdd()">+ إضافة</button></div>
+        <div class="sq-f grow"><span>مسح كود قطعة عشان تُرد من الحساب</span>
+          <input id="sq-retcode" placeholder="امسح باركود القطعة المفتوحة واضغط Enter عشان تتّرد تلقائي"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();sqReturnByCode();}"></div>
+        <div class="sq-f auto"><span>&nbsp;</span><button class="btn btn-sm btn-danger" onclick="sqReturnByCode()" type="button">↩ رد القطعة</button></div>
       </div>
 
       <div class="tabs" style="margin:12px 0 8px;">
@@ -9888,7 +9899,7 @@ function renderSquares(){
             <th style="width:90px;">باركود</th><th style="width:80px;">الكود</th><th style="width:60px;">عيار</th>
             <th style="width:120px;">الصنف</th><th class="right" style="width:90px;">الوزن</th>
             <th class="right" style="width:110px;">السعر</th><th class="right" style="width:120px;">الإجمالي</th>
-            <th>الحساب</th><th style="width:150px;">كود المرتجع / المردود</th><th style="width:90px;">الحالة</th><th style="width:150px;">حفظ / رد</th>
+            <th>الحساب</th><th style="width:150px;">ملاحظات</th><th style="width:90px;">الحالة</th><th style="width:150px;">حفظ / رد</th>
           </tr></thead>
           <tbody>
           ${rows.length? rows.map(p=>{
@@ -9909,9 +9920,9 @@ function renderSquares(){
               <td class="right num" style="font-weight:800;color:var(--navy);">${fmtCash(p.totalCash)}</td>
               <td>${esc(sqPartyName(p))}</td>
               <td>${st==='pending'
-                ? `<input value="${esc(p.returnCode||'')}" placeholder="كود المرتجع" style="padding:5px 7px;font-size:12.5px;"
-                     onchange="setPendingReturnCode('${p.id}',this.value)">`
-                : `<span class="muted">${esc(p.returnCode||p.note||'—')}</span>`}</td>
+                ? `<input value="${esc(p.note||'')}" placeholder="ملاحظات" style="padding:5px 7px;font-size:12.5px;"
+                     onchange="setPendingNote('${p.id}',this.value)">`
+                : `<span class="muted">${esc(p.note||'—')}</span>`}</td>
               <td><span class="pill ${st==='pending'?'pill-gold':st==='confirmed'?'pill-green':'pill-red'}">${st==='pending'?'مفتوحة':st==='confirmed'?'محفوظة':'مردودة'}</span></td>
               <td>${st==='pending'? `<div style="display:flex;gap:6px;">
                     <button class="btn btn-sm btn-gold" onclick="confirmPending('${p.id}')">حفظ</button>
@@ -9943,6 +9954,30 @@ function setPendingReturnCode(id, val){
   if(!p || (p.status||'pending')!=='pending') return;
   mutate(()=>{ p.returnCode = String(val||'').trim(); p.note = p.returnCode; }, 'اتسجل كود المرتجع');
 }
+function sqReturnByCode(){
+  const input = document.getElementById('sq-retcode');
+  const raw = input? input.value.trim() : '';
+  if(!raw){ toast('امسح أو اكتب كود القطعة الأول'); return; }
+  const p = state.pendingSales.find(x=>{
+    if((x.status||'pending')!=='pending') return false;
+    if(x.barcodeValue===raw) return true;
+    if(x.pieceId){ const pc = state.pieces.find(y=>y.id===x.pieceId); if(pc && (pc.uid===raw || String(pc.no)===raw)) return true; }
+    return false;
+  });
+  if(!p){
+    toast('مفيش مربع مفتوح بالكود ده');
+    if(input){ input.value=''; input.focus(); }
+    return;
+  }
+  const who = sqPartyName(p);
+  mutate(()=>{ p.status='deleted'; }, 'تم رد القطعة من حساب '+who);
+  if(input){ input.value=''; input.focus(); }
+}
+function setPendingNote(id, val){
+  const p = state.pendingSales.find(x=>x.id===id);
+  if(!p || (p.status||'pending')!=='pending') return;
+  mutate(()=>{ p.note = String(val||'').trim(); }, 'اتسجلت الملاحظة');
+}
 function sqRecalc(){
   const w=parseFloat((document.getElementById('sq-weight')||{}).value)||0;
   const p=parseFloat((document.getElementById('sq-price')||{}).value)||0;
@@ -9958,9 +9993,19 @@ function sqScan(){
   document.getElementById('sq-weight').value = piece.weight;
   const priceEl = document.getElementById('sq-price');
   const typed = priceEl? (parseFloat(priceEl.value)||0) : 0;
-  if(priceEl && !typed) priceEl.value = pieceSellMakingRate(piece).toFixed(2);
+  const autoPrice = pieceSellMakingRate(piece);
+  if(priceEl && !typed) priceEl.value = autoPrice.toFixed(2);
   sqRecalc();
   if(el) el.value = '';
+  if(!typed && autoPrice<=0){
+    // السعر مش معروف تلقائي للقطعة دي — نظهر خانتي الوزن والسعر يدوي بدل ما نرفض بصمت
+    const ww = document.getElementById('sq-weight-wrap'), pw = document.getElementById('sq-price-wrap');
+    const aw = document.getElementById('sq-manual-add-wrap');
+    if(ww) ww.style.display=''; if(pw) pw.style.display=''; if(aw) aw.style.display='';
+    toast('مش عارفين نجيب سعر القطعة دي تلقائي — اكتب السعر يدوي واضغط "+ إضافة"');
+    const p = document.getElementById('sq-price'); if(p) p.focus();
+    return;
+  }
   sqAdd();   // بيتسجل على طول من غير خطوة تانية
 }
 function sqAdd(){
@@ -9987,6 +10032,7 @@ function sqAdd(){
   uiState.sqPieceId = null;
   render();
   ['sq-scan','sq-weight','sq-price','sq-retcode'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  ['sq-weight-wrap','sq-price-wrap','sq-manual-add-wrap'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
   const t=document.getElementById('sq-total'); if(t) t.value='0.00';
   const s=document.getElementById('sq-scan'); if(s) s.focus();
 }
